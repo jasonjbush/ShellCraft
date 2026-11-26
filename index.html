@@ -1,0 +1,1541 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ShellCraft — Crew Team Management Simulator</title>
+<style>
+  :root {
+    --bg:#0b1118; --surface:#121b24; --surface-2:#182430; --border:#253647;
+    --text:#e6edf3; --muted:#8b9bb0; --accent:#38bdf8; --accent-dim:rgba(56,189,248,0.14);
+    --gold:#f59e0b; --green:#22c55e; --red:#ef4444; --purple:#a855f7;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:13.5px; line-height:1.4; }
+  .app { max-width:1540px; margin:0 auto; padding:12px; }
+  .main-shell { display:grid; grid-template-columns:1fr 290px; gap:12px; align-items:start; }
+  @media(max-width:1160px){ .main-shell{ grid-template-columns:1fr; } }
+
+  /* Header & 52-Week Strip */
+  .topbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:10px; }
+  .brand h1 { margin:0; font-size:17px; display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+  .brand .sub { color:var(--muted); font-size:11.5px; margin-top:2px; }
+  .status-pills, .actions, .toolbar { display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+  .pill { background:var(--surface-2); border:1px solid var(--border); padding:5px 10px; border-radius:6px; font-size:11.5px; font-family:var(--mono); }
+  .pill strong { color:var(--accent); }
+  .pill.warn strong { color:var(--gold); }
+  .pill.danger strong { color:var(--red); }
+
+  .week-strip-wrap { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin-bottom:10px; }
+  .week-strip-head { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--muted); margin-bottom:5px; flex-wrap:wrap; gap:6px; }
+  .week-strip { display:grid; grid-template-columns:repeat(52,1fr); gap:2px; }
+  .wk-cell { height:18px; border-radius:3px; background:var(--surface-2); border:1px solid var(--border); font-size:8.5px; font-family:var(--mono); display:flex; align-items:center; justify-content:center; color:var(--muted); position:relative; }
+  .wk-cell.past { opacity:0.42; }
+  .wk-cell.race { background:rgba(34,197,94,0.22); border-color:rgba(34,197,94,0.6); color:#86efac; font-weight:700; }
+  .wk-cell.camp { background:rgba(168,85,247,0.24); border-color:rgba(168,85,247,0.65); color:#e9d5ff; font-weight:700; }
+  .wk-cell.now { background:var(--accent); border-color:#fff; color:#04101a; font-weight:800; box-shadow:0 0 8px rgba(56,189,248,0.65); opacity:1; }
+  @media(max-width:900px){ .week-strip{ grid-template-columns:repeat(26,1fr); } }
+
+  /* Controls */
+  button, select, input[type="text"], input[type="search"], input[type="number"] {
+    font-family:var(--sans); font-size:12.5px; border-radius:6px; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text); padding:6px 9px;
+  }
+  button, select { cursor:pointer; }
+  button:hover, select:hover, input:focus { border-color:var(--accent); outline:none; }
+  button:disabled, select:disabled, input:disabled { opacity:0.45; cursor:not-allowed; }
+  .btn-primary { background:#0284c7; border-color:#38bdf8; color:#fff; font-weight:600; padding:8px 14px; }
+  .btn-primary:hover { background:#0369a1; }
+  .btn-gold { background:rgba(245,158,11,0.16); border-color:var(--gold); color:#fbbf24; font-weight:600; }
+  .btn-danger { background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.45); color:#fca5a5; }
+  .btn-sm { padding:4px 8px; font-size:11px; }
+  .btn-boat { background:var(--surface-2); color:var(--muted); font-weight:600; padding:5px 11px; font-size:12px; }
+  .btn-boat.active { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+
+  /* Tabs & Cards */
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .tab-btn { background:var(--surface); color:var(--muted); font-weight:600; padding:8px 13px; }
+  .tab-btn.active { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1.15fr; gap:12px; }
+  @media(max-width:960px){ .grid-2{ grid-template-columns:1fr; } }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:13px; margin-bottom:12px; }
+  .card h2 { margin:0 0 9px 0; font-size:14.5px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:7px; border-bottom:1px solid var(--border); padding-bottom:7px; }
+  .card h3 { margin:10px 0 6px 0; font-size:12.5px; color:var(--accent); }
+
+  /* 7-Day Builder */
+  .template-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+  .template-group { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .camp-banner { background:rgba(168,85,247,0.16); border:1px solid rgba(168,85,247,0.5); color:#e9d5ff; padding:8px 11px; border-radius:7px; margin-bottom:10px; font-size:12px; }
+  .week-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:7px; margin-bottom:9px; }
+  @media(max-width:1320px){ .week-grid{ grid-template-columns:repeat(4,1fr); } }
+  @media(max-width:740px){ .week-grid{ grid-template-columns:repeat(2,1fr); } }
+  .day-col { background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:7px; display:flex; flex-direction:column; gap:6px; }
+  .day-header { display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:4px; font-weight:700; font-size:12px; }
+  .day-header span.day-load { font-family:var(--mono); font-size:10.5px; color:var(--muted); font-weight:400; }
+  .slot-box { background:#0e161f; border:1px solid var(--border); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px; }
+  .slot-box.is-off { opacity:0.62; border-style:dashed; }
+  .slot-box.is-strength { border-color:rgba(168,85,247,0.45); background:rgba(168,85,247,0.06); }
+  .slot-box.is-test { border-color:rgba(245,158,11,0.55); background:rgba(245,158,11,0.08); }
+  .slot-title { font-size:10px; color:var(--muted); text-transform:uppercase; display:flex; justify-content:space-between; }
+  .slot-box select.slot-intensity { width:100%; padding:4px 5px; font-size:11px; font-weight:600; }
+  .slot-row { display:flex; gap:4px; align-items:center; }
+  .slot-row label { font-size:10px; color:var(--muted); min-width:30px; }
+  .slot-row input[type="number"] { width:100%; padding:3px 5px; font-size:11px; font-family:var(--mono); }
+  .slot-row select.slot-unit { padding:3px; font-size:10.5px; font-family:var(--mono); min-width:46px; }
+  .preview-strip { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--accent-dim); border:1px solid rgba(56,189,248,0.35); border-radius:6px; padding:7px 10px; font-size:11.5px; font-family:var(--mono); }
+
+  /* Forms, Tables, Badges */
+  .form-row { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+  .form-row label { font-size:11.5px; color:var(--muted); font-weight:600; }
+  .plan-desc { background:var(--surface-2); border-left:3px solid var(--accent); padding:8px 10px; border-radius:4px; font-size:11.5px; color:var(--muted); margin-bottom:10px; }
+  .toggle-pill { display:flex; align-items:center; gap:7px; background:var(--surface-2); border:1px solid var(--border); padding:6px 10px; border-radius:6px; font-size:12px; cursor:pointer; }
+  .toggle-pill input { accent-color:var(--accent); cursor:pointer; }
+
+  .table-wrap { overflow-x:auto; max-height:580px; overflow-y:auto; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th { color:var(--muted); font-size:10.5px; text-transform:uppercase; background:var(--surface-2); position:sticky; top:0; z-index:2; }
+  tr.clickable:hover { background:rgba(56,189,248,0.06); cursor:pointer; }
+  .mono { font-family:var(--mono); }
+  .bar-wrap { width:50px; height:6px; background:#090e14; border-radius:4px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:4px; }
+  .bar-fill { height:100%; border-radius:4px; }
+  .badge { display:inline-block; padding:2px 6px; border-radius:999px; font-size:10.5px; font-weight:600; }
+  .b-ok { background:rgba(34,197,94,0.16); color:#4ade80; }
+  .b-warn { background:rgba(234,179,8,0.18); color:#facc15; }
+  .b-bad { background:rgba(239,68,68,0.18); color:#f87171; }
+  .b-info { background:rgba(56,189,248,0.16); color:#38bdf8; }
+  .b-trans { background:linear-gradient(90deg,rgba(56,189,248,0.22),rgba(236,72,153,0.22)); color:#f9a8d4; border:1px solid rgba(236,72,153,0.35); }
+  .b-nb { background:rgba(168,85,247,0.2); color:#e9d5ff; border:1px solid rgba(168,85,247,0.35); }
+  .b-tier-s { background:rgba(245,158,11,0.22); color:#fbbf24; border:1px solid rgba(245,158,11,0.4); }
+  .b-tier-a { background:rgba(168,85,247,0.2); color:#d8b4fe; }
+  .b-tier-b { background:rgba(56,189,248,0.18); color:#7dd3fc; }
+  .b-tier-c { background:rgba(139,155,176,0.18); color:#cbd5e1; }
+
+  .log-feed { max-height:390px; overflow-y:auto; display:flex; flex-direction:column; gap:7px; }
+  .log-entry { background:var(--surface-2); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:6px; padding:8px 10px; font-size:12px; }
+  .log-entry.warn { border-left-color:var(--gold); }
+  .log-entry.danger { border-left-color:var(--red); }
+  .log-entry.race { border-left-color:var(--green); }
+  .log-entry .log-head { display:flex; justify-content:space-between; font-size:10.5px; color:var(--muted); margin-bottom:3px; font-family:var(--mono); }
+  .log-entry ul { margin:3px 0 0 15px; padding:0; }
+
+  .seat-row { display:grid; grid-template-columns:110px 1fr 145px; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); }
+  .seat-label { font-weight:600; font-size:12px; }
+  .seat-meta { font-family:var(--mono); font-size:11px; color:var(--muted); text-align:right; }
+  .kpi-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:10px; }
+  .kpi { background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
+  .kpi .k-label { font-size:10.5px; color:var(--muted); text-transform:uppercase; }
+  .kpi .k-val { font-size:16.5px; font-weight:700; font-family:var(--mono); margin-top:2px; }
+
+  /* Right Sidebar Coaches Poll */
+  .poll-item { display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border); margin-bottom:5px; font-size:12px; }
+  .poll-item.is-user { border-color:var(--accent); background:var(--accent-dim); }
+  .poll-rank { font-family:var(--mono); font-weight:700; width:24px; color:var(--gold); }
+  .poll-pts { font-family:var(--mono); font-size:11px; color:var(--muted); }
+
+  /* Modals */
+  .modal-backdrop { position:fixed; inset:0; background:rgba(5,8,12,0.82); display:none; align-items:center; justify-content:center; padding:14px; z-index:50; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:11px; max-width:650px; width:100%; padding:16px 18px; max-height:90vh; overflow-y:auto; }
+  .modal-head { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; }
+  .stat-mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin:8px 0; }
+  .stat-mini { background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:7px; }
+  .stat-mini span { display:block; font-size:10.5px; color:var(--muted); }
+  .stat-mini strong { font-family:var(--mono); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>
+        ShellCraft Rowing Manager
+        <span id="programTierBadge" class="badge b-tier-s">S-Tier</span>
+        <span id="programDivisionBadge" class="badge b-info">Men's Heavyweight</span>
+      </h1>
+      <div class="sub" id="programSub">University of Washington • Pac-10 / MPSF • 52-Week Cycle</div>
+    </div>
+    <div class="status-pills">
+      <div class="pill">Yr <strong id="yearNum">1</strong> • Wk <strong id="weekNum">1</strong>/52</div>
+      <div class="pill">Phase: <strong id="seasonPhase">Fall</strong></div>
+      <div class="pill warn">Next: <strong id="nextRacePill">Wk 6 HOCR</strong></div>
+      <div class="pill" id="alertPill">Alerts: <strong id="alertCount">0</strong></div>
+    </div>
+    <div class="actions">
+      <button class="btn-primary" id="btnAdvance">Advance Week &rarr;</button>
+      <button class="btn-gold" id="btnErgTest">Quick 2k Test</button>
+      <button id="btnOpenSetup" class="btn-danger">New Program</button>
+    </div>
+  </header>
+
+  <!-- VISUAL 52-WEEK STRIP -->
+  <div class="week-strip-wrap">
+    <div class="week-strip-head">
+      <span><strong>52-Week Annual Timeline</strong> (Wks 1–10 Fall • 11–24 Winter • 25–39 Spring • 40–46 Summer • 47–52 Transition)</span>
+      <span><span class="badge b-info">Now</span> <span class="badge b-ok">Race</span> <span class="badge b-nb">VIP Camp (15–16, 41–42)</span></span>
+    </div>
+    <div class="week-strip" id="weekStrip"></div>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="dashboard">Daily Training &amp; Log</button>
+    <button class="tab-btn" data-tab="roster">Roster &amp; Benchmarks (<span id="rosterCount">0</span>)</button>
+    <button class="tab-btn" data-tab="lineup">Boat Line-up Builder (1V / 2V / 3V / 4+)</button>
+    <button class="tab-btn" data-tab="world">52-Week Calendar &amp; Tiers</button>
+  </nav>
+
+  <div class="main-shell">
+    <div class="main-col">
+      <!-- TAB 1 -->
+      <section id="tab-dashboard" class="tab-panel active">
+        <div class="card">
+          <h2>
+            7-Day Dual-Slot Workout Builder
+            <span class="badge b-info" id="recWeekTag">Fall Prep</span>
+          </h2>
+          <div id="vipCampBanner" class="camp-banner" style="display:none;"></div>
+          <div class="template-bar">
+            <div class="template-group">
+              <label for="templateSelect" style="font-size:11.5px;color:var(--muted);font-weight:600;">Template:</label>
+              <select id="templateSelect"></select>
+              <button id="btnLoadTemplate" class="btn-sm btn-gold">Load</button>
+              <button id="btnDeleteTemplate" class="btn-sm btn-danger">Del</button>
+            </div>
+            <div class="template-group">
+              <input type="text" id="templateNameInput" placeholder="Save current week name..." style="width:190px;padding:4px 8px;font-size:11.5px;" />
+              <button id="btnSaveTemplate" class="btn-sm btn-primary">Save</button>
+            </div>
+          </div>
+          <div class="week-grid" id="sevenDayGrid"></div>
+          <div class="preview-strip" id="weeklyPreviewBar"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h2>Training Modes &amp; Squad Readiness</h2>
+            <div class="form-row">
+              <label for="autoRestModeSelect">Auto-Rest &amp; Medical Mode</label>
+              <select id="autoRestModeSelect">
+                <option value="boat_all_uninjured">Boat All Uninjured (Injured: PT/XT/Peptides; Others: Full Plan)</option>
+                <option value="individualized">Individualized (High-RHR/Ill: 60m UT2 M-Sa AM + 2 Prehab)</option>
+                <option value="rest_fatigued">Rest Fatigued (High-RHR/Ill/Fatigued: Light Recovery/Rest)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="toggle-pill">
+                <input type="checkbox" id="smallBoatToggle" />
+                <span><strong>2- / 1x Small-Boat Selection</strong> (ON: faster CNS recovery &amp; tech/speed transfer • OFF: 8+/erg low-CNS base)</span>
+              </label>
+            </div>
+            <div class="kpi-grid" id="teamKpiGrid"></div>
+            <div class="plan-desc" style="margin-bottom:0;" id="coachTipBox"></div>
+          </div>
+
+          <div class="card">
+            <h2>Sports Science &amp; Regatta Log <span class="badge b-ok">Auto-Saved</span></h2>
+            <div class="log-feed" id="logFeed"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2 -->
+      <section id="tab-roster" class="tab-panel">
+        <div class="card">
+          <h2>Squad Roster, Class Cycle &amp; Benchmarks <span style="font-size:11.5px;font-weight:400;color:var(--muted);">Click row for Dossier &amp; Test History</span></h2>
+          <div class="toolbar">
+            <input type="search" id="rosterSearch" placeholder="Search name or background..." style="min-width:190px;" />
+            <select id="rosterFilter">
+              <option value="all">Filter: All Athletes</option>
+              <option value="rowers">Rowers Only</option>
+              <option value="cox">Coxswains Only</option>
+              <option value="boats">Assigned to Boats</option>
+              <option value="alerts">Alerts / Injured / Events</option>
+              <option value="trans">Trans &amp; Non-Binary</option>
+            </select>
+            <select id="rosterSort">
+              <option value="split">Sort: Fastest 2k Split</option>
+              <option value="vo2">Sort: Highest VO2 Max</option>
+              <option value="peak">Sort: Highest Peak Power</option>
+              <option value="tech">Sort: Highest Technique</option>
+              <option value="cns">Sort: Highest CNS Fatigue</option>
+              <option value="class">Sort: Class (Sr &rarr; Fr)</option>
+              <option value="name">Sort: Name (A-Z)</option>
+            </select>
+            <span id="rosterFilterCount" class="mono" style="font-size:11.5px;color:var(--muted);margin-left:auto;"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name &amp; Class</th><th>Role / Background</th><th>Ht/Wt</th><th>VO2</th><th>Peak/AT</th>
+                  <th>Est 2k</th><th>Benchmarks (2k / 6k / 60m / 3x3k)</th><th>Tech/Flex</th>
+                  <th>Phys/CNS</th><th>RHR</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="rosterTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3 -->
+      <section id="tab-lineup" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Boat Line-up Builder <button id="btnAutoLineupAll" class="btn-sm">Auto-Fill All Boats</button></h2>
+            <div class="toolbar" id="boatSelectorBtns">
+              <button class="btn-boat active" data-boat="V8">1V (8+)</button>
+              <button class="btn-boat" data-boat="2V8">2V (8+)</button>
+              <button class="btn-boat" data-boat="3V8">3V (8+)</button>
+              <button class="btn-boat" data-boat="V4">V4+</button>
+            </div>
+            <div id="lineupSeats"></div>
+          </div>
+          <div class="card">
+            <h2 id="boatTelemetryTitle">Varsity 8+ (1V) Telemetry</h2>
+            <div class="kpi-grid" id="boatKpiGrid"></div>
+            <div id="boatAnalysisBox" class="plan-desc"></div>
+            <h3>Race &amp; Benchmark History</h3>
+            <div class="log-feed" id="raceHistoryFeed" style="max-height:260px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4 -->
+      <section id="tab-world" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h2>52-Week Calendar (<span id="calLeagueLabel"></span>)</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Wk</th><th>Phase</th><th>Milestone / Regatta</th><th>Dist</th><th>Format</th></tr></thead>
+                <tbody id="calendarTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Global Tiers
+              <select id="tierViewSelect" class="btn-sm" style="padding:3px 7px;">
+                <option value="Colleges_Heavy">Colleges (Heavy)</option>
+                <option value="Colleges_Light">Colleges (Light)</option>
+                <option value="HighSchools">High Schools</option>
+                <option value="National">National Teams</option>
+              </select>
+            </h2>
+            <div id="tierListContainer" style="max-height:540px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT SIDEBAR: WEEKLY COACHES POLL -->
+    <aside class="card" style="position:sticky;top:12px;">
+      <h2>Weekly Coaches Poll <span class="badge b-info" id="pollWeekBadge">Wk 1</span></h2>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Updates weekly from your V8+ speed, regatta finishes &amp; rival drift.</div>
+      <div id="coachesPollList"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- ATHLETE MODAL -->
+<div class="modal-backdrop" id="athleteModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><strong id="mName" style="font-size:16px;"></strong><div id="mSub" style="font-size:11.5px;color:var(--muted);"></div></div>
+      <button id="btnCloseModal" class="btn-sm">Close</button>
+    </div>
+    <p id="mBio" style="margin:0 0 10px 0;font-style:italic;color:#cbd5e1;font-size:12.5px;"></p>
+    <div class="stat-mini-grid" id="mStats"></div>
+    <h3>Benchmark Erg Results &amp; History</h3>
+    <div id="mBenchmarks" class="plan-desc" style="margin-bottom:8px;"></div>
+    <div id="mTestHistory" style="max-height:130px;overflow-y:auto;font-size:11.5px;font-family:var(--mono);color:var(--muted);margin-bottom:8px;"></div>
+    <div id="mAlerts" class="plan-desc"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+      <button id="btnToggleRest" class="btn-gold">Toggle Individual Rest</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP MODAL -->
+<div class="modal-backdrop" id="setupModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><strong style="font-size:16px;">Program &amp; League Setup</strong><div style="font-size:11.5px;color:var(--muted);">Configure division, league, team &amp; squad size (12–60).</div></div>
+      <button id="btnCancelSetup" class="btn-sm">Cancel</button>
+    </div>
+    <div class="grid-2" style="gap:9px;">
+      <div class="form-row"><label for="setupGender">Program Division</label>
+        <select id="setupGender"><option value="Men">Men's Program (Inclusive)</option><option value="Women">Women's Program (Inclusive)</option></select>
+      </div>
+      <div class="form-row"><label for="setupWeight">Weight Class</label>
+        <select id="setupWeight"><option value="Heavy">Heavyweight / Open</option><option value="Light">Lightweight (70kg M / 57kg W)</option></select>
+      </div>
+    </div>
+    <div class="form-row"><label for="setupLeague">League / Circuit</label>
+      <select id="setupLeague">
+        <option value="Pac10_MPSF">Pac-10 / MPSF</option>
+        <option value="Ivy_EARC">Ivy League / Eastern Sprints (EARC)</option>
+        <option value="NCAA_D1">NCAA Division I (Women's Open)</option>
+        <option value="IRA">IRA National Championship Circuit</option>
+        <option value="NEIRA">NEIRA (New England Prep)</option>
+        <option value="Scholastic_US">US Scholastic (Stotesbury / SRAA)</option>
+        <option value="UK_Henley">UK Schools &amp; Universities (Henley)</option>
+        <option value="International">World Rowing / Olympic Circuit</option>
+      </select>
+    </div>
+    <div class="form-row"><label for="setupTeam">Program</label><select id="setupTeam"></select></div>
+    <div class="form-row"><label for="setupCustomName">Custom Team Name (Optional)</label><input type="text" id="setupCustomName" placeholder="Leave blank for selected real program..." /></div>
+    <div class="form-row">
+      <label for="setupRosterSize">Squad Size: <strong id="setupRosterSizeVal" class="mono" style="color:var(--accent);">36</strong></label>
+      <input type="range" id="setupRosterSize" min="12" max="60" value="36" />
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+      <button id="btnStartCareer" class="btn-primary">Generate Squad &amp; Start</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const STORAGE_KEY = "shellcraft_rowing_sim_v4";
+  const TEMPLATE_KEY = "shellcraft_week_templates_v2";
+  const VIP_CAMP_WEEKS = new Set([15, 16, 41, 42]);
+  const CLASSES = ["Fr", "So", "Jr", "Sr"];
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  function get52WeekPhase(w){
+    if(w<=10) return {season:"Fall Prep & Head Racing",short:"Fall"};
+    if(w<=24) return {season:"Winter Base & Indoor",short:"Winter"};
+    if(w<=39) return {season:"Spring Sprint & Champs",short:"Spring"};
+    if(w<=46) return {season:"Summer / Int'l Racing",short:"Summer"};
+    return {season:"Off-Season / Transition",short:"Off-Season"};
+  }
+
+  const INTENSITIES = {
+    off:{group:"rowing",label:"— Off / Rest —",hrLabel:"Rest",paceMPerMin:200,physPer60:0,cnsPer60:0,vo2Per60:0,atPer60:0,peakPer60:0,techPer60:0,flexPer60:0,leanKgPer60:0,isHigh:false,isStrength:false,isTest:false,recoveryBoost:true},
+    recovery:{group:"rowing",label:"Recovery / XT (~120 bpm)",hrLabel:"~120 bpm",paceMPerMin:200,physPer60:0.8,cnsPer60:0.5,vo2Per60:0.02,atPer60:0.15,peakPer60:0,techPer60:0.10,flexPer60:0.1,leanKgPer60:0,isHigh:false,isStrength:false,isTest:false,recoveryBoost:true},
+    tech:{group:"rowing",label:"Technical Drills (Mod CNS)",hrLabel:"~125 bpm",paceMPerMin:207,physPer60:2.0,cnsPer60:5.5,vo2Per60:0.01,atPer60:0.10,peakPer60:0,techPer60:2.25,flexPer60:0.2,leanKgPer60:0,isHigh:false,isStrength:false,isTest:false,recoveryBoost:false},
+    ut2:{group:"rowing",label:"UT2 Steady State (Base)",hrLabel:"130-150 bpm",paceMPerMin:240,physPer60:7.5,cnsPer60:4.5,vo2Per60:0.09,atPer60:0.65,peakPer60:0,techPer60:0.42,flexPer60:0,leanKgPer60:0,isHigh:false,isStrength:false,isTest:false,recoveryBoost:false},
+    pace10k:{group:"rowing",label:"10k Pace (Sub-AT)",hrLabel:"160-172 bpm",paceMPerMin:268,physPer60:20,cnsPer60:14,vo2Per60:0.14,atPer60:4.8,peakPer60:0,techPer60:0.30,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:false,recoveryBoost:false},
+    pace6k:{group:"rowing",label:"6k Pace (Threshold)",hrLabel:"172-184 bpm",paceMPerMin:283,physPer60:32,cnsPer60:23,vo2Per60:0.24,atPer60:7.5,peakPer60:1.5,techPer60:0.22,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:false,recoveryBoost:false},
+    pace2k:{group:"rowing",label:"2k Pace (VO2 Max)",hrLabel:"184-194 bpm",paceMPerMin:306,physPer60:54,cnsPer60:40,vo2Per60:0.65,atPer60:6.2,peakPer60:6.0,techPer60:0.12,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:false,recoveryBoost:false},
+    max:{group:"rowing",label:"Max Effort (Sprint)",hrLabel:"195+ / Max",paceMPerMin:333,physPer60:110,cnsPer60:125,vo2Per60:0.30,atPer60:2.0,peakPer60:55,techPer60:0.05,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:false,recoveryBoost:false},
+    str_power:{group:"strength",label:"Strength: Power",hrLabel:"60-75% 1RM",paceMPerMin:200,physPer60:18,cnsPer60:34,vo2Per60:0,atPer60:1.0,peakPer60:38,techPer60:0.15,flexPer60:0,leanKgPer60:0.015,isHigh:true,isStrength:true,isTest:false,recoveryBoost:false},
+    str_hypertrophy:{group:"strength",label:"Strength: Hypertrophy",hrLabel:"70-80% 1RM",paceMPerMin:200,physPer60:28,cnsPer60:19,vo2Per60:0,atPer60:1.5,peakPer60:18,techPer60:0,flexPer60:-0.35,leanKgPer60:0.09,isHigh:true,isStrength:true,isTest:false,recoveryBoost:false},
+    str_prehab:{group:"strength",label:"Strength: Prehab/Rehab/Core",hrLabel:"Core/Mobility",paceMPerMin:200,physPer60:2.0,cnsPer60:2.0,vo2Per60:0,atPer60:0.2,peakPer60:2,techPer60:0.35,flexPer60:2.4,leanKgPer60:0,isHigh:false,isStrength:true,isTest:false,recoveryBoost:true},
+    test_2k:{group:"test",label:"Benchmark: 2k Erg Test",hrLabel:"Max 2000m",paceMPerMin:305,physPer60:95,cnsPer60:115,vo2Per60:0.45,atPer60:3.5,peakPer60:10,techPer60:0.1,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:true,fixed:{pieces:1,value:2000,unit:"m",rest:0},recoveryBoost:false},
+    test_6k:{group:"test",label:"Benchmark: 6k Erg Test",hrLabel:"Max 6000m",paceMPerMin:282,physPer60:65,cnsPer60:58,vo2Per60:0.35,atPer60:8.5,peakPer60:3,techPer60:0.2,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:true,fixed:{pieces:1,value:6000,unit:"m",rest:0},recoveryBoost:false},
+    test_60m:{group:"test",label:"Benchmark: 60-Min (20 spm)",hrLabel:"20 spm Cap",paceMPerMin:255,physPer60:34,cnsPer60:24,vo2Per60:0.22,atPer60:6.8,peakPer60:1,techPer60:0.5,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:true,fixed:{pieces:1,value:60,unit:"min",rest:0},recoveryBoost:false},
+    test_3x3k:{group:"test",label:"Benchmark: 3x3k (10m rest)",hrLabel:"Avg 3x3000m",paceMPerMin:278,physPer60:52,cnsPer60:42,vo2Per60:0.30,atPer60:7.8,peakPer60:2,techPer60:0.3,flexPer60:0,leanKgPer60:0,isHigh:true,isStrength:false,isTest:true,fixed:{pieces:3,value:3000,unit:"m",rest:10},recoveryBoost:false}
+  };
+
+  function makeSlot(intensity="off",pieces=1,value=60,unit="min",rest=0){ return {intensity,pieces,value,unit,rest}; }
+  function cloneWeekPlan(p){ return p.map(d=>({slots:[{...d.slots[0]},{...d.slots[1]}]})); }
+  function getVipCampPlan(){
+    return DAYS.map((_,i)=> i<6
+      ? {slots:[makeSlot("ut2",1,90,"min",0), makeSlot("ut2",1,90,"min",0)]}
+      : {slots:[makeSlot("recovery",1,30,"min",0), makeSlot("off",1,0,"min",0)]}
+    );
+  }
+
+  const DEFAULT_TEMPLATES = [
+    {id:"tpl_base1",name:"Base Building Week 1",builtin:true,days:[
+      {slots:[makeSlot("ut2",2,50,"min",3),makeSlot("recovery",1,90,"min",0)]},
+      {slots:[makeSlot("ut2",1,60,"min",0),makeSlot("tech",4,8,"min",10)]},
+      {slots:[makeSlot("pace6k",3,3000,"m",8),makeSlot("recovery",1,30,"min",0)]},
+      {slots:[makeSlot("off",1,0,"min",0),makeSlot("ut2",3,30,"min",3)]},
+      {slots:[makeSlot("ut2",3,25,"min",10),makeSlot("tech",4,10,"min",10)]},
+      {slots:[makeSlot("pace10k",2,6000,"m",12),makeSlot("recovery",1,60,"min",0)]},
+      {slots:[makeSlot("off",1,0,"min",0),makeSlot("off",1,0,"min",0)]}
+    ]},
+    {id:"tpl_polarized",name:"Polarized + Strength",builtin:true,days:[
+      {slots:[makeSlot("ut2",1,60,"min",0),makeSlot("str_hypertrophy",1,45,"min",0)]},
+      {slots:[makeSlot("ut2",1,60,"min",0),makeSlot("tech",1,45,"min",0)]},
+      {slots:[makeSlot("pace10k",2,20,"min",8),makeSlot("str_prehab",1,35,"min",0)]},
+      {slots:[makeSlot("ut2",1,70,"min",0),makeSlot("off",1,0,"min",0)]},
+      {slots:[makeSlot("ut2",1,60,"min",0),makeSlot("str_power",1,45,"min",0)]},
+      {slots:[makeSlot("pace6k",3,2000,"m",6),makeSlot("recovery",1,30,"min",0)]},
+      {slots:[makeSlot("off",1,0,"min",0),makeSlot("off",1,0,"min",0)]}
+    ]},
+    {id:"tpl_peak",name:"Peak VO2 + Power",builtin:true,days:[
+      {slots:[makeSlot("ut2",1,60,"min",0),makeSlot("str_power",1,40,"min",0)]},
+      {slots:[makeSlot("pace2k",4,1500,"m",7),makeSlot("recovery",1,30,"min",0)]},
+      {slots:[makeSlot("ut2",1,75,"min",0),makeSlot("str_prehab",1,30,"min",0)]},
+      {slots:[makeSlot("pace6k",2,3000,"m",8),makeSlot("off",1,0,"min",0)]},
+      {slots:[makeSlot("ut2",1,50,"min",0),makeSlot("max",6,500,"m",3)]},
+      {slots:[makeSlot("pace2k",2,2000,"m",10),makeSlot("recovery",1,25,"min",0)]},
+      {slots:[makeSlot("off",1,0,"min",0),makeSlot("off",1,0,"min",0)]}
+    ]},
+    {id:"tpl_taper",name:"Championship Taper",builtin:true,days:[
+      {slots:[makeSlot("ut2",1,40,"min",0),makeSlot("str_prehab",1,25,"min",0)]},
+      {slots:[makeSlot("pace6k",4,5,"min",8),makeSlot("off",1,0,"min",0)]},
+      {slots:[makeSlot("pace2k",5,2,"min",5),makeSlot("recovery",1,20,"min",0)]},
+      {slots:[makeSlot("off",1,0,"min",0),makeSlot("off",1,0,"min",0)]},
+      {slots:[makeSlot("max",5,250,"m",5),makeSlot("tech",1,25,"min",0)]},
+      {slots:[makeSlot("pace2k",4,1,"min",4),makeSlot("off",1,0,"min",0)]},
+      {slots:[makeSlot("off",1,0,"min",0),makeSlot("off",1,0,"min",0)]}
+    ]}
+  ];
+
+  // COMPACT WORLD DATABASE
+  const WORLD_DB = {
+    Leagues:{
+      Pac10_MPSF:{label:"Pac-10 / MPSF",levelKey:"Colleges",tierPool:"Colleges_Heavy",
+        teams:[{name:"University of Washington",tier:"S-Tier",prestige:99,home:"Seattle, WA"},{name:"UC Berkeley",tier:"S-Tier",prestige:97,home:"Oakland, CA"},{name:"Stanford University",tier:"S-Tier",prestige:95,home:"Redwood Shores, CA"},{name:"UCLA (Women's)",tier:"B-Tier",prestige:81,home:"Marina del Rey, CA"},{name:"USC (Women's)",tier:"B-Tier",prestige:79,home:"Los Angeles, CA"},{name:"UBC Thunderbirds",tier:"B-Tier",prestige:80,home:"Vancouver, BC"},{name:"Oregon State",tier:"C-Tier",prestige:70,home:"Corvallis, OR"},{name:"UC San Diego",tier:"C-Tier",prestige:68,home:"San Diego, CA"}],
+        calendar:[{week:6,season:"Fall",name:"Head of the Charles",dist:4800,format:"4,800m Head"},{week:9,season:"Fall",name:"Head of the Lake",dist:4800,format:"Fall Head Finale"},{week:22,season:"Winter",name:"Winter 2k Challenge",dist:2000,format:"Indoor Erg"},{week:29,season:"Spring",name:"San Diego Crew Classic",dist:2000,format:"Invitational"},{week:33,season:"Spring",name:"UW–Cal / Windermere Cup",dist:2000,format:"Rivalry Dual"},{week:36,season:"Spring",name:"Pac-10 / MPSF Champs",dist:2000,format:"Conference Finals"},{week:38,season:"Spring",name:"IRA / NCAA Nationals",dist:2000,format:"National Finals"},{week:45,season:"Summer",name:"World U23 Champs",dist:2000,format:"Int'l U23"}]},
+      Ivy_EARC:{label:"Ivy League / EARC",levelKey:"Colleges",tierPool:"Colleges_Heavy",
+        teams:[{name:"Harvard University",tier:"S-Tier",prestige:96,home:"Cambridge, MA"},{name:"Yale University",tier:"S-Tier",prestige:96,home:"Derby, CT"},{name:"Brown University",tier:"S-Tier",prestige:94,home:"Providence, RI"},{name:"Princeton University",tier:"A-Tier",prestige:92,home:"Princeton, NJ"},{name:"Cornell University",tier:"A-Tier",prestige:91,home:"Ithaca, NY"},{name:"Penn",tier:"A-Tier",prestige:88,home:"Philadelphia, PA"},{name:"Dartmouth College",tier:"B-Tier",prestige:82,home:"Hanover, NH"},{name:"Columbia University",tier:"B-Tier",prestige:76,home:"New York, NY"}],
+        calendar:[{week:6,season:"Fall",name:"Head of the Charles",dist:4800,format:"Head Race"},{week:8,season:"Fall",name:"Princeton Chase",dist:4400,format:"3-Mile Chase"},{week:22,season:"Winter",name:"EARC Erg Sprints",dist:2000,format:"Indoor 2k"},{week:29,season:"Spring",name:"Early Cup Duals",dist:2000,format:"Ivy Duals"},{week:33,season:"Spring",name:"Late Cup Duals",dist:2000,format:"Cup Racing"},{week:36,season:"Spring",name:"Eastern Sprints",dist:2000,format:"EARC Finals"},{week:38,season:"Spring",name:"IRA / NCAA Nationals",dist:2000,format:"National Finals"},{week:40,season:"Summer",name:"Harvard–Yale 4-Mile",dist:6437,format:"4-Mile Match"}]},
+      NCAA_D1:{label:"NCAA Division I",levelKey:"Colleges",tierPool:"Colleges_Heavy",
+        teams:[{name:"University of Texas",tier:"S-Tier",prestige:98,home:"Austin, TX"},{name:"Stanford University",tier:"S-Tier",prestige:96,home:"Redwood Shores, CA"},{name:"University of Washington",tier:"S-Tier",prestige:95,home:"Seattle, WA"},{name:"Brown University",tier:"S-Tier",prestige:94,home:"Providence, RI"},{name:"Yale University",tier:"S-Tier",prestige:94,home:"Derby, CT"},{name:"Virginia",tier:"A-Tier",prestige:90,home:"Charlottesville, VA"},{name:"Ohio State",tier:"A-Tier",prestige:89,home:"Columbus, OH"},{name:"Michigan",tier:"A-Tier",prestige:88,home:"Ann Arbor, MI"}],
+        calendar:[{week:6,season:"Fall",name:"Head of the Charles",dist:4800,format:"Champ 8+/4+"},{week:9,season:"Fall",name:"Head of the Hooch",dist:5000,format:"5,000m Head"},{week:22,season:"Winter",name:"NCAA Erg Benchmark",dist:2000,format:"Indoor 2k"},{week:29,season:"Spring",name:"Crew Classic / Oak Ridge",dist:2000,format:"Showcase"},{week:33,season:"Spring",name:"Longhorn Invite",dist:2000,format:"Cross-Conf"},{week:36,season:"Spring",name:"Conference Champs",dist:2000,format:"AQ Finals"},{week:38,season:"Spring",name:"NCAA D1 Championship",dist:2000,format:"National Finals"}]},
+      IRA:{label:"IRA National Circuit",levelKey:"Colleges",tierPool:"Colleges_Heavy",
+        teams:[{name:"U.S. Naval Academy",tier:"A-Tier",prestige:88,home:"Annapolis, MD"},{name:"Wisconsin",tier:"A-Tier",prestige:87,home:"Madison, WI"},{name:"Syracuse",tier:"A-Tier",prestige:87,home:"Syracuse, NY"},{name:"Northeastern",tier:"B-Tier",prestige:82,home:"Boston, MA"},{name:"Boston University",tier:"B-Tier",prestige:81,home:"Boston, MA"},{name:"Georgetown",tier:"B-Tier",prestige:78,home:"Washington, DC"},{name:"Drexel",tier:"C-Tier",prestige:68,home:"Philadelphia, PA"},{name:"Temple",tier:"C-Tier",prestige:66,home:"Philadelphia, PA"}],
+        calendar:[{week:6,season:"Fall",name:"Head of the Charles",dist:4800,format:"Head Race"},{week:8,season:"Fall",name:"Head of the Schuylkill",dist:4400,format:"Fall 8+"},{week:22,season:"Winter",name:"IRA Erg Assessment",dist:2000,format:"Indoor 2k"},{week:29,season:"Spring",name:"Knecht Cup",dist:2000,format:"Multi-Lane"},{week:33,season:"Spring",name:"Spring Cup Duals",dist:2000,format:"Duals"},{week:36,season:"Spring",name:"Eastern Sprints / Dad Vail",dist:2000,format:"Regional Finals"},{week:38,season:"Spring",name:"IRA National Regatta",dist:2000,format:"National Finals"}]},
+      NEIRA:{label:"NEIRA (Prep)",levelKey:"HighSchools",tierPool:"HighSchools",
+        teams:[{name:"Deerfield Academy",tier:"A-Tier",prestige:93,home:"Deerfield, MA"},{name:"Phillips Exeter",tier:"A-Tier",prestige:92,home:"Exeter, NH"},{name:"Phillips Andover",tier:"A-Tier",prestige:89,home:"Andover, MA"},{name:"Kent School",tier:"A-Tier",prestige:89,home:"Kent, CT"},{name:"St. Paul's (NH)",tier:"B-Tier",prestige:79,home:"Concord, NH"},{name:"Choate / Tabor",tier:"B-Tier",prestige:78,home:"New England"}],
+        calendar:[{week:6,season:"Fall",name:"Head of the Charles (Youth)",dist:4800,format:"Youth 8+"},{week:8,season:"Fall",name:"Head of the Fish",dist:3500,format:"Fall Head"},{week:22,season:"Winter",name:"NEIRA Winter Ergs",dist:2000,format:"Indoor 2k"},{week:30,season:"Spring",name:"Early Prep Duals",dist:1500,format:"1500m Duals"},{week:34,season:"Spring",name:"Founders Day",dist:1500,format:"Cup Races"},{week:37,season:"Spring",name:"NEIRA Champs",dist:1500,format:"Quinsigamond"},{week:39,season:"Spring",name:"Youth Nationals",dist:2000,format:"Sarasota 2k"}]},
+      Scholastic_US:{label:"US Scholastic",levelKey:"HighSchools",tierPool:"HighSchools",
+        teams:[{name:"St. Joseph's Prep",tier:"S-Tier",prestige:98,home:"Philadelphia, PA"},{name:"Gonzaga College HS",tier:"S-Tier",prestige:96,home:"Washington, DC"},{name:"New Trier HS",tier:"S-Tier",prestige:96,home:"Winnetka, IL"},{name:"Winter Park HS",tier:"S-Tier",prestige:95,home:"Winter Park, FL"},{name:"Marin / Newport / Rye",tier:"S-Tier",prestige:96,home:"CA / NY"},{name:"TJHSST",tier:"A-Tier",prestige:86,home:"Occoquan, VA"},{name:"Chaminade HS",tier:"A-Tier",prestige:86,home:"Mineola, NY"}],
+        calendar:[{week:6,season:"Fall",name:"Head of the Charles (Youth)",dist:4800,format:"Youth 8+"},{week:9,season:"Fall",name:"Head of the Schuylkill",dist:4000,format:"Junior Head"},{week:22,season:"Winter",name:"Mid-Atlantic Erg Sprints",dist:2000,format:"Indoor 2k"},{week:29,season:"Spring",name:"Manny Flick Series",dist:1500,format:"Sprint Series"},{week:36,season:"Spring",name:"Stotesbury Cup",dist:1500,format:"Scholastic Classic"},{week:37,season:"Spring",name:"SRAA Nationals",dist:1500,format:"Scholastic Finals"},{week:39,season:"Spring",name:"Youth Nationals",dist:2000,format:"2k Finals"}]},
+      UK_Henley:{label:"UK Schools & Henley",levelKey:"HighSchools",tierPool:"HighSchools",
+        teams:[{name:"St. Paul's (London)",tier:"S-Tier",prestige:99,home:"Thames Tideway"},{name:"Eton College",tier:"S-Tier",prestige:99,home:"Dorney Lake"},{name:"Radley College",tier:"S-Tier",prestige:96,home:"Abingdon, UK"},{name:"Oxford Brookes",tier:"S-Tier",prestige:97,home:"Wallingford, UK"},{name:"Shiplake College",tier:"A-Tier",prestige:93,home:"Henley, UK"},{name:"St. Edward's",tier:"A-Tier",prestige:92,home:"Oxford, UK"}],
+        calendar:[{week:6,season:"Fall",name:"Pairs Head / HOCR",dist:4800,format:"Autumn Head"},{week:9,season:"Fall",name:"Fours Head",dist:6800,format:"Tideway"},{week:26,season:"Spring",name:"Schools' Head (SHORR)",dist:6800,format:"Tideway Triple 1"},{week:32,season:"Spring",name:"Wallingford Regatta",dist:2000,format:"Dorney Lake"},{week:37,season:"Spring",name:"Nat'l Schools' Regatta",dist:2000,format:"Triple 2"},{week:40,season:"Summer",name:"Marlow Regatta",dist:2000,format:"Henley Seeding"},{week:43,season:"Summer",name:"Henley Royal Regatta",dist:2112,format:"Knockout"}]},
+      International:{label:"World Rowing / Olympic",levelKey:"National",tierPool:"National",
+        teams:[{name:"Great Britain",tier:"S-Tier",prestige:99,home:"Caversham, UK"},{name:"Germany",tier:"S-Tier",prestige:98,home:"Dortmund"},{name:"Netherlands",tier:"S-Tier",prestige:97,home:"Amsterdam"},{name:"United States",tier:"S-Tier",prestige:96,home:"Princeton, NJ"},{name:"Romania",tier:"S-Tier",prestige:95,home:"Snagov"},{name:"New Zealand",tier:"A-Tier",prestige:94,home:"Karapiro"},{name:"Australia",tier:"A-Tier",prestige:91,home:"Penrith"},{name:"Italy",tier:"A-Tier",prestige:90,home:"Piediluco"}],
+        calendar:[{week:8,season:"Fall",name:"Fall Speed Orders",dist:2000,format:"Trials"},{week:22,season:"Winter",name:"World Indoor Champs",dist:2000,format:"2k Erg"},{week:32,season:"Spring",name:"Continental Champs",dist:2000,format:"6-Lane Final"},{week:35,season:"Spring",name:"World Cup I",dist:2000,format:"World Cup"},{week:40,season:"Summer",name:"Lucerne World Cup III",dist:2000,format:"Rotsee"},{week:46,season:"Summer",name:"World / Olympic Regatta",dist:2000,format:"Pinnacle Final"}]}
+    },
+    Tiers:{
+      Colleges_Heavy:{S_Tier:[{name:"Washington",prestige:99,home:"Seattle, WA",notes:"22 IRA V8+ titles"},{name:"UC Berkeley",prestige:97,home:"Oakland, CA",notes:"19 IRA V8+ titles"},{name:"Harvard",prestige:96,home:"Cambridge, MA",notes:"Rowe Cup dynasty"},{name:"Yale",prestige:96,home:"Derby, CT",notes:"Eastern Sprints power"},{name:"Texas",prestige:95,home:"Austin, TX",notes:"4 NCAA W8+ titles"},{name:"Stanford",prestige:95,home:"Redwood Shores, CA",notes:"3 NCAA W8+ titles"}],A_Tier:[{name:"Princeton",prestige:92,home:"Princeton, NJ",notes:"Ten Eyck contender"},{name:"Cornell",prestige:91,home:"Ithaca, NY",notes:"26 IRA V8+ titles"},{name:"Navy / Wisconsin / Syracuse",prestige:87,home:"MD/WI/NY",notes:"Grand Finalists"}],B_Tier:[{name:"Northeastern / BU / Dartmouth",prestige:81,home:"New England",notes:"Sprints finalists"}],C_Tier:[{name:"Oregon St / UCSD / Drexel",prestige:68,home:"OR/CA/PA",notes:"B/C Finalists"}]},
+      Colleges_Light:{S_Tier:[{name:"Harvard Lwt",prestige:99,home:"Cambridge, MA",notes:"22 Jope Cups"},{name:"Princeton Lwt",prestige:97,home:"Princeton, NJ",notes:"16 Jope Cups"},{name:"Cornell Lwt",prestige:96,home:"Ithaca, NY",notes:"7+ IRA titles"}],A_Tier:[{name:"Yale / Penn / Navy Lwt",prestige:88,home:"CT/PA/MD",notes:"IRA podiums"}],B_Tier:[{name:"Dartmouth / Georgetown Lwt",prestige:79,home:"NH/DC",notes:"Grand Finalists"}],C_Tier:[{name:"MIT / Mercyhurst Lwt",prestige:65,home:"MA/PA",notes:"V4+/2x contenders"}]},
+      HighSchools:{S_Tier:[{name:"St. Paul's (UK)",prestige:99,home:"London",notes:"Henley PE champs"},{name:"Eton College",prestige:99,home:"Windsor",notes:"7x UK Triple"},{name:"St. Joseph's Prep",prestige:98,home:"Philadelphia",notes:"15+ Stotesbury titles"},{name:"Gonzaga / New Trier",prestige:96,home:"DC/IL",notes:"SRAA & Youth Nats"}],A_Tier:[{name:"Deerfield / Exeter / Andover",prestige:91,home:"MA/NH",notes:"NEIRA leaders"}],B_Tier:[{name:"St. Paul's (NH) / Canisius",prestige:79,home:"NH/NY",notes:"Grand Finalists"}],C_Tier:[{name:"Local Public HS",prestige:63,home:"Municipal",notes:"Regional qualifiers"}]},
+      National:{S_Tier:[{name:"Great Britain",prestige:99,home:"Caversham",notes:"34 Olympic Golds"},{name:"Germany",prestige:98,home:"Dortmund",notes:"Deutschland-Achter"},{name:"Netherlands",prestige:97,home:"Amsterdam",notes:"Paris 2024 leader"},{name:"United States",prestige:96,home:"Princeton",notes:"91 Olympic medals"}],A_Tier:[{name:"New Zealand / Australia / Italy",prestige:91,home:"NZL/AUS/ITA",notes:"World medallists"}],B_Tier:[{name:"France / Ireland / Croatia",prestige:82,home:"EUR",notes:"Olympic medallists"}],C_Tier:[{name:"Norway / Czechia / Greece",prestige:71,home:"INT",notes:"Small-boat finalists"}]}
+    }
+  };
+
+  const BACKGROUNDS = [
+    {id:"swimmer",label:"HS Swimmer",vo2Mod:[10,14],leanMod:0.03,weightMod:[0,3],peakMult:1.10,recMod:0.20,pre:0,techBase:32,flexMod:18,litBonus:12,bios:["Former All-American swimmer. Effortless water feel, still learning leg drive."]},
+    {id:"xc",label:"Cross-Country / Nordic",vo2Mod:[12,16],leanMod:0.01,weightMod:[-7,-3],peakMult:0.90,recMod:0.25,pre:0,techBase:24,flexMod:-10,litBonus:4,bios:["All-State distance runner. Massive aerobic motor, needs strength work."]},
+    {id:"power",label:"Sprinter / Football",vo2Mod:[2,5],leanMod:0.06,weightMod:[4,9],peakMult:1.25,recMod:0.05,pre:0,techBase:21,flexMod:-6,litBonus:5,bios:["Explosive sprinter. Crushes power tests, prone to shooting the slide."]},
+    {id:"jr_nat",label:"Jr. National Rower",vo2Mod:[7,11],leanMod:0.04,weightMod:[1,4],peakMult:1.12,recMod:0.10,pre:1.0,techBase:72,flexMod:4,litBonus:6,bios:["Youth Nationals medalist. Crisp catch timing and fierce seat-racer."]},
+    {id:"club_hs",label:"Club HS Rower",vo2Mod:[4,7],leanMod:0.02,weightMod:[-1,3],peakMult:1.05,recMod:0.05,pre:0.6,techBase:52,flexMod:0,litBonus:4,bios:["Rowed 2 years at a local club. Solid bladework, needs bigger engine."]},
+    {id:"walkon",label:"Walk-On",vo2Mod:[-4,0],leanMod:-0.04,weightMod:[-4,4],peakMult:0.85,recMod:-0.15,pre:0,techBase:15,flexMod:-15,litBonus:0,bios:["Recruited off campus quad. Zero athletic past, huge early learning curve."]}
+  ];
+
+  const MALE_NAMES=["Liam","Noah","Ethan","Caleb","Lucas","Owen","Mason","Jack","Sam","Ben","Henry","Cole","Wyatt","Declan","Julian","Theo","Aiden","Rowan","Miles","Carter","Eli","Jasper","Gavin","Leo","Nolan","Devon","Finn"];
+  const FEMALE_NAMES=["Maya","Chloe","Hannah","Claire","Sophie","Grace","Emma","Nora","Olivia","Zoe","Tessa","Elena","Sienna","Ava","Ruby","Clara","Iris","Freya","Lydia","Maren","Naomi","Piper","Hazel","Camille","Maeve","Audrey","Quinn"];
+  const NB_NAMES=["Riley","Jordan","Rowan","Sage","Avery","Morgan","Quinn","Charlie","Taylor","Finley","Kai","Skyler","Casey","Emerson"];
+  const LAST_NAMES=["Mercer","Callahan","Vance","Kowalski","Bauer","Henderson","Whitman","O'Connor","Sato","Lindqvist","Bennett","Donovan","Kerr","Reyes","Alvarez","Thorne","McAllister","Fitzgerald","Park","Nielsen","Galloway","Hayes","Fletcher","Russo","Morales","Okafor","Patel","Sinclair","Boyle","Keller"];
+
+  // MATH & PHYSIOLOGY HELPERS
+  function clamp(v,min,max){ return Number.isFinite(v) ? Math.max(min,Math.min(max,v)) : min; }
+  function rand(min,max){ return min + Math.random()*(max-min); }
+  function randInt(min,max){ return Math.floor(rand(min,max+1)); }
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+  function formatSplit(sec){
+    const safe=clamp(sec,75,220);
+    let m=Math.floor(safe/60), r=(safe-m*60).toFixed(1);
+    if(parseFloat(r)>=60){ m+=1; r="0.0"; }
+    return `${m}:${parseFloat(r)<10?"0":""}${r}`;
+  }
+  function formatTimeFromTotal(totalSec){
+    const safe=clamp(totalSec,60,3600);
+    let m=Math.floor(safe/60), r=(safe-m*60).toFixed(1);
+    if(parseFloat(r)>=60){ m+=1; r="0.0"; }
+    return `${m}:${parseFloat(r)<10?"0":""}${r}`;
+  }
+
+  function calcVO2Watts(a){
+    if(a.isCoxswain) return 0;
+    return clamp(((a.vo2Max*a.weight)/1000)*68, 140, 580);
+  }
+
+  function calc2kSplitSec(a, isRace=false){
+    if(a.isCoxswain) return 145.0;
+    const vo2W=calcVO2Watts(a);
+    const atW=clamp(a.atWatts,90,vo2W*0.92);
+    const peakW=clamp(a.peakPower,220,1250);
+    const baseWatts=clamp(0.82*(0.60*vo2W+0.40*atW)+0.18*0.45*peakW, 100, 620);
+    let splitSec=500/Math.max(2.3, Math.cbrt(baseWatts/2.80));
+    const cns=clamp(a.cnsFatigue,0,100), phys=clamp(a.physFatigue||0,0,100);
+    const effFat=0.65*cns+0.35*phys;
+    if(effFat>40 && effFat<=75) splitSec+=(effFat-40)*0.08;
+    else if(effFat>75) splitSec+=2.8+(effFat-75)*0.22;
+    if(a.mentalResilience>=75) splitSec-=0.8;
+    else if(a.mentalResilience<40 && isRace) splitSec+=1.5;
+    const ev=a.lifeEvent?a.lifeEvent.id:null;
+    if(ev==="flu") splitSec+=cns>80?3.0:1.6;
+    else if(ev==="midterms" && cns>70) splitSec+=a.mentalResilience>80?0.5:1.8;
+    else if(ev==="breakup" && cns>65 && a.mentalResilience<55) splitSec+=2.2;
+    else if(ev==="car_accident") splitSec+=4.0;
+    else if(a.injury && a.injury.weeksLeft>0) splitSec+=3.5;
+    return clamp(splitSec, 83.0, 165.0);
+  }
+
+  // Compute any of the 4 Benchmark Erg Tests
+  function evaluateBenchmarkTest(a, testKey){
+    const s2k = calc2kSplitSec(a, true);
+    const vo2W = calcVO2Watts(a);
+    const atRatio = clamp(a.atWatts / Math.max(1, vo2W), 0.60, 0.90);
+    const aerobicFactor = (0.78 - atRatio) * 18; // better AT ratio = smaller dropoff from 2k
+    const stFactor = (70 - a.stPct) * 0.08;
+
+    if(testKey==="test_2k"){
+      const split = clamp(s2k + rand(-0.3, 0.3), 83, 170);
+      return { key:"test_2k", label:"2k", split, totalStr:formatTimeFromTotal(split*4), summary:`${formatSplit(split)} (${formatTimeFromTotal(split*4)})` };
+    }
+    if(testKey==="test_6k"){
+      const split = clamp(s2k + 6.5 + aerobicFactor + stFactor + rand(-0.4, 0.4), 89, 185);
+      return { key:"test_6k", label:"6k", split, totalStr:formatTimeFromTotal(split*12), summary:`${formatSplit(split)} (${formatTimeFromTotal(split*12)})` };
+    }
+    if(testKey==="test_60m"){
+      // 60-min @ 20 spm cap: emphasizes AT, VO2, slow-twitch%, technique
+      const techHelp = (70 - a.technique) * 0.05;
+      const split = clamp(s2k + 12.0 + aerobicFactor*1.25 + stFactor*1.4 + techHelp + rand(-0.5, 0.5), 94, 195);
+      const meters = Math.round((3600 / split) * 500);
+      return { key:"test_60m", label:"60m@20", split, meters, totalStr:`${meters}m`, summary:`${formatSplit(split)} (${meters}m)` };
+    }
+    // test_3x3k (10m rest, average splits of all 3 pieces)
+    const p1 = clamp(s2k + 5.2 + aerobicFactor*0.9 + rand(-0.3, 0.3), 88, 182);
+    const recPenalty = (1.15 - clamp(a.recoveryRate, 0.7, 1.3)) * 2.4;
+    const p2 = clamp(p1 + 0.4 + recPenalty*0.5 + rand(-0.2, 0.3), 88, 185);
+    const p3 = clamp(p2 + 0.6 + recPenalty*0.8 + rand(-0.2, 0.4), 88, 188);
+    const avgSplit = (p1 + p2 + p3) / 3;
+    return {
+      key:"test_3x3k", label:"3x3k", split:avgSplit, pieces:[p1,p2,p3],
+      totalStr:`avg ${formatSplit(avgSplit)}`,
+      summary:`${formatSplit(avgSplit)} [${formatSplit(p1)}/${formatSplit(p2)}/${formatSplit(p3)}]`
+    };
+  }
+
+  function calcWattsFromSplit(s){ const v=500/Math.max(70,s); return clamp(2.8*v*v*v,70,720); }
+  function calcTodayRHR(a){
+    const viral=(a.lifeEvent && a.lifeEvent.id==="flu")?14:0;
+    return Math.round(a.rhrBase + 0.08*a.cnsFatigue + 0.08*(a.physFatigue||0) + 0.18*a.allostaticLoad + viral);
+  }
+
+  function slotToMinutes(slot){
+    if(!slot || slot.intensity==="off") return {workMin:0,singlePieceMin:0,restTotalMin:0,pieces:1,rest:0};
+    const cat=INTENSITIES[slot.intensity]||INTENSITIES.ut2;
+    const pieces = cat.fixed ? cat.fixed.pieces : clamp(Number(slot.pieces)||1,1,30);
+    const val = cat.fixed ? cat.fixed.value : clamp(Number(slot.value)||0,0,50000);
+    const rest = cat.fixed ? cat.fixed.rest : (pieces>1?clamp(Number(slot.rest)||0,0,60):0);
+    const unit = cat.fixed ? cat.fixed.unit : (cat.isStrength?"min":slot.unit);
+    const singlePieceMin = unit==="m" ? (val/Math.max(100,cat.paceMPerMin)) : val;
+    const workMin = clamp(pieces*singlePieceMin,0,300);
+    return {workMin, singlePieceMin, restTotalMin:clamp((pieces-1)*rest,0,300), pieces, rest};
+  }
+
+  // ROSTER & FRESHMAN GENERATOR
+  function createAthlete(programMeta, opts={}){
+    const isWomen = programMeta.gender==="Women";
+    const isLight = programMeta.isLightweight;
+    const isHS = programMeta.levelKey==="HighSchools";
+    const isIntl = programMeta.levelKey==="National";
+    const tierScale = (programMeta.prestige - 75)/25;
+    const classYear = opts.classYear || pick(CLASSES);
+    const usedNames = opts.usedNames || new Set();
+
+    const r = Math.random();
+    const iden = isWomen
+      ? (r<0.08?{label:"Trans Woman",pronouns:"She/Her",tag:"trans",pool:FEMALE_NAMES}:r<0.12?{label:"Non-Binary",pronouns:"They/Them",tag:"nb",pool:NB_NAMES}:{label:"Woman",pronouns:"She/Her",tag:"cis",pool:FEMALE_NAMES})
+      : (r<0.08?{label:"Trans Man",pronouns:"He/Him",tag:"trans",pool:MALE_NAMES}:r<0.12?{label:"Non-Binary",pronouns:"They/Them",tag:"nb",pool:NB_NAMES}:{label:"Man",pronouns:"He/Him",tag:"cis",pool:MALE_NAMES});
+
+    let name="", tries=0;
+    do{ name=`${pick(iden.pool)} ${pick(LAST_NAMES)}`; tries++; }while(usedNames.has(name)&&tries<40);
+    if(usedNames.has(name)) name=`${name} ${randInt(2,9)}`;
+    usedNames.add(name);
+
+    const isCox = Boolean(opts.isCoxswain);
+    if(isCox){
+      const isExp = opts.isExpCox !== undefined ? opts.isExpCox : (classYear==="Jr"||classYear==="Sr");
+      return {
+        id:`ath_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+        name, classYear, genderIdentity:iden.label, pronouns:iden.pronouns, identityTag:iden.tag,
+        isCoxswain:true, background:isExp?"Varsity Coxswain":"Novice Coxswain",
+        bio:isExp?"Sharp tactical voice who reads crosswinds and calls clean Power 10s.":"Developing steering and rhythm.",
+        height:Math.round(isWomen?rand(154,168):rand(160,174)),
+        weight:Number((isWomen?rand(48,53):rand(51,56)).toFixed(1)),
+        leanMassPct:0.78, vo2Max:48, geneticVo2Ceiling:56, stPct:68, peakPower:360, atWatts:145,
+        technique:isExp?Math.round(rand(68,86)):Math.round(rand(32,52)),
+        flexibility:Math.round(rand(65,92)), recoveryRate:Number(rand(0.95,1.15).toFixed(2)),
+        physFatigue:Math.round(rand(5,15)), cnsFatigue:Math.round(rand(8,18)),
+        mentalResilience:clamp(Math.round(rand(56,88)+tierScale*5),40,97), allostaticLoad:Math.round(rand(5,14)),
+        rhrBase:Math.round(rand(52,64)), atHr:175, pre:isExp?0.8:0,
+        benchmarks:{}, testHistory:[], lifeEvent:null, injury:null, individualRest:false, daysIdle:0
+      };
+    }
+
+    const bg = isIntl ? pick([BACKGROUNDS[0],BACKGROUNDS[1],BACKGROUNDS[3],BACKGROUNDS[3]])
+      : isHS ? pick([BACKGROUNDS[0],BACKGROUNDS[1],BACKGROUNDS[2],BACKGROUNDS[4],BACKGROUNDS[5]])
+      : (classYear==="Fr" ? pick([BACKGROUNDS[0],BACKGROUNDS[1],BACKGROUNDS[2],BACKGROUNDS[3],BACKGROUNDS[4],BACKGROUNDS[5]]) : pick(BACKGROUNDS));
+
+    // Upperclassmen start slightly more developed; incoming Freshmen have fresh early-career stats
+    const classMod = classYear==="Fr" ? -1.4 : classYear==="So" ? 0 : classYear==="Jr" ? 1.1 : 1.9;
+    let baseHt = !isWomen&&!isLight ? (isIntl?rand(188,199):rand(181,197)) : !isWomen&&isLight ? rand(176,187) : isWomen&&!isLight ? (isIntl?rand(176,187):rand(170,185)) : rand(165,175);
+    let baseWt = !isWomen&&!isLight ? (isIntl?rand(87,99):rand(78,95)) : !isWomen&&isLight ? rand(66.5,73) : isWomen&&!isLight ? (isIntl?rand(70,81):rand(63,78)) : rand(54,59.5);
+    if(isHS){ baseHt-=2; baseWt-=(isLight?1.5:4.5); }
+    const height=Math.round(baseHt);
+    const weight=Number(clamp(baseWt + rand(bg.weightMod[0],bg.weightMod[1])*(isLight?0.25:isWomen?0.75:1), isLight?52:58, 105).toFixed(1));
+    const leanMassPct=Number(clamp((isWomen?0.76:0.81)+bg.leanMod+rand(-0.02,0.02),0.68,0.88).toFixed(2));
+    const vo2Max=Number(clamp((isWomen?45.5:49)+(isIntl?5.5:isHS?-2:0)+rand(bg.vo2Mod[0],bg.vo2Mod[1])+tierScale*3+classMod, 40, 69).toFixed(1));
+    const geneticVo2Ceiling=Number(clamp(vo2Max+rand(5,11),54,72).toFixed(1));
+    const technique=Math.round(clamp(15+(bg.pre*55)+bg.litBonus+rand(-4,4)+tierScale*3+(classMod*3), 12, 88));
+    let peakRaw = !isWomen&&!isLight ? rand(760,990) : !isWomen&&isLight ? rand(600,760) : isWomen&&!isLight ? rand(520,680) : rand(390,495);
+    const peakPower=Math.round(clamp(peakRaw*bg.peakMult+tierScale*38-(isHS?45:0)+classMod*15, 340, 1160));
+    const vo2W=calcVO2Watts({vo2Max,weight,isCoxswain:false});
+    const atWatts=Math.round(clamp(vo2W*(bg.pre>0?rand(0.75,0.82):rand(0.66,0.75)), 120, vo2W*0.86));
+
+    return {
+      id:`ath_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+      name, classYear, genderIdentity:iden.label, pronouns:iden.pronouns, identityTag:iden.tag,
+      isCoxswain:false, background:bg.label,
+      bio:iden.tag!=="cis"?"Proud trans/non-binary athlete bringing relentless winter erg grit and boathouse leadership.":pick(bg.bios),
+      height, weight, leanMassPct, vo2Max, geneticVo2Ceiling,
+      stPct:bg.id==="xc"?randInt(74,84):bg.id==="power"?randInt(58,68):randInt(64,77),
+      peakPower, atWatts, technique,
+      flexibility:Math.round(clamp((isWomen?74:66)+bg.flexMod+rand(-10,12),28,99)),
+      recoveryRate:Number(clamp(0.90+bg.recMod+rand(-0.06,0.06),0.70,1.30).toFixed(2)),
+      physFatigue:randInt(8,18), cnsFatigue:randInt(10,22),
+      mentalResilience:Math.round(clamp(52+(bg.pre>0?12:4)+(iden.tag!=="cis"?5:0)+rand(-10,16),32,95)),
+      allostaticLoad:randInt(4,15),
+      rhrBase:Math.round(clamp(59-(vo2Max-45)*0.55+rand(-3,3),40,69)),
+      atHr:randInt(166,182), pre:bg.pre,
+      benchmarks:{}, testHistory:[], lifeEvent:null, injury:null, individualRest:false, daysIdle:0
+    };
+  }
+
+  function generateRoster(programMeta){
+    const total=clamp(Number(programMeta.rosterSize)||36,12,60);
+    const coxCount=total>=50?5:total>=38?4:total>=24?3:2;
+    const rowerCount=total-coxCount;
+    const roster=[], usedNames=new Set();
+    for(let c=0;c<coxCount;c++){
+      roster.push(createAthlete(programMeta,{isCoxswain:true,isExpCox:c<Math.ceil(coxCount/2),classYear:CLASSES[c%4],usedNames}));
+    }
+    for(let i=0;i<rowerCount;i++){
+      roster.push(createAthlete(programMeta,{isCoxswain:false,classYear:CLASSES[i%4],usedNames}));
+    }
+    return roster;
+  }
+
+  // LINEUPS, POLL & STATE
+  const BOAT_DEFS={V8:{label:"Varsity 8+ (1V)",seats:["8","7","6","5","4","3","2","1","cox"]},"2V8":{label:"2nd Varsity 8+ (2V)",seats:["8","7","6","5","4","3","2","1","cox"]},"3V8":{label:"3rd Varsity 8+ (3V)",seats:["8","7","6","5","4","3","2","1","cox"]},V4:{label:"Varsity 4+ (4+)",seats:["4","3","2","1","cox"]}};
+  let state=null, activeBoatKey="V8", activeModalAthleteId=null, templates=[];
+
+  function loadTemplates(){
+    let custom=[];
+    try{ const raw=localStorage.getItem(TEMPLATE_KEY); if(raw){ const p=JSON.parse(raw); if(Array.isArray(p)) custom=p.filter(t=>t&&!t.builtin); } }catch(e){}
+    templates=[...DEFAULT_TEMPLATES.map(t=>({...t,days:cloneWeekPlan(t.days)})),...custom];
+    saveTemplates();
+  }
+  function saveTemplates(){ try{ localStorage.setItem(TEMPLATE_KEY,JSON.stringify(templates)); }catch(e){} }
+
+  function autoSelectAllLineups(roster){
+    const rPool=[...roster.filter(a=>!a.isCoxswain&&!a.injury).sort((a,b)=>(calc2kSplitSec(a)-a.technique*0.09)-(calc2kSplitSec(b)-b.technique*0.09)), ...roster.filter(a=>!a.isCoxswain&&a.injury)];
+    const cPool=[...roster.filter(a=>a.isCoxswain&&!a.injury).sort((a,b)=>(b.technique+b.mentalResilience)-(a.technique+a.mentalResilience)), ...roster.filter(a=>a.isCoxswain&&a.injury)];
+    const lineups={V8:{"8":null,"7":null,"6":null,"5":null,"4":null,"3":null,"2":null,"1":null,"cox":null},"2V8":{"8":null,"7":null,"6":null,"5":null,"4":null,"3":null,"2":null,"1":null,"cox":null},"3V8":{"8":null,"7":null,"6":null,"5":null,"4":null,"3":null,"2":null,"1":null,"cox":null},V4:{"4":null,"3":null,"2":null,"1":null,"cox":null}};
+    let rI=0,cI=0;
+    const fill=(k,n)=>{ const seats=BOAT_DEFS[k].seats.filter(s=>s!=="cox"); for(let i=0;i<n;i++){ lineups[k][seats[i]]=rPool[rI]?rPool[rI].id:null; if(rPool[rI])rI++; } lineups[k].cox=cPool[cI]?cPool[cI].id:null; if(cPool[cI])cI++; };
+    fill("V8",8); if(rPool.length>=16)fill("2V8",8); if(rPool.length>=24)fill("3V8",8); if(rPool.length>=rI+4)fill("V4",4);
+    return lineups;
+  }
+
+  function initCoachesPoll(prog){
+    const leagueTeams=(WORLD_DB.Leagues[prog.league]||WORLD_DB.Leagues.Pac10_MPSF).teams;
+    const seen=new Set([prog.name]);
+    const list=[{name:prog.name,isUser:true,rating:prog.prestige + rand(-1.5,1.5)}];
+    leagueTeams.forEach(t=>{ if(!seen.has(t.name)){ seen.add(t.name); list.push({name:t.name,isUser:false,rating:t.prestige+rand(-2,2)}); } });
+    list.sort((a,b)=>b.rating-a.rating);
+    return list;
+  }
+
+  function updateCoachesPoll(raceBonus=0){
+    if(!state.poll || !state.poll.length) state.poll = initCoachesPoll(state.program);
+    const tel=computeBoatTelemetry("V8");
+    let userPerfScore = state.program.prestige;
+    if(tel.ready){
+      const isW=state.program.gender==="Women", isL=state.program.isLightweight, isHS=state.program.levelKey==="HighSchools", isIntl=state.program.levelKey==="National";
+      let ref2k = isIntl?(isW?356:322):isHS?(isW?388:352):isL?(isW?382:348):(isW?364:338);
+      userPerfScore = clamp(99 - (tel.est2kTimeSec - ref2k)*0.85, 55, 102);
+    }
+    state.poll.forEach(entry=>{
+      if(entry.isUser){
+        entry.rating = clamp(entry.rating*0.65 + userPerfScore*0.35 + raceBonus, 50, 105);
+      } else {
+        entry.rating = clamp(entry.rating + rand(-1.4, 1.4), 52, 102);
+      }
+    });
+    state.poll.sort((a,b)=>b.rating-a.rating);
+  }
+
+  function createNewGame(config){
+    const leagueData=WORLD_DB.Leagues[config.league]||WORLD_DB.Leagues.Pac10_MPSF;
+    const prog={
+      gender:config.gender, isLightweight:config.weight==="Light", league:config.league, leagueLabel:leagueData.label,
+      levelKey:leagueData.levelKey,
+      tierPool:(config.league==="Pac10_MPSF"||config.league==="Ivy_EARC"||config.league==="IRA")&&config.weight==="Light"?"Colleges_Light":leagueData.tierPool,
+      name:config.customName.trim()||config.teamObj.name, teamName:config.teamObj.name,
+      tier:config.teamObj.tier, prestige:config.teamObj.prestige, home:config.teamObj.home, rosterSize:config.rosterSize
+    };
+    const roster=generateRoster(prog);
+    state={
+      year:1, week:1, program:prog, roster, lineups:autoSelectAllLineups(roster),
+      weekPlan:cloneWeekPlan(DEFAULT_TEMPLATES[0].days),
+      autoRestMode:"individualized", smallBoatMode:false,
+      poll:initCoachesPoll(prog),
+      logs:[{year:1,week:1,type:"info",title:`Yr 1 Wk 1 — ${prog.name} (${prog.gender}'s ${prog.isLightweight?"Lwt":"Hwt"})`,
+        bullets:[`Squad of <strong>${roster.length} athletes</strong> (${CLASSES.join("/")}) assembled.`, `Weeks 15–16 & 41–42 are locked <strong>VIP Training Camps</strong> (0 CNS gain, 2x VIP recovery).`, `Benchmark tests (2k, 6k, 60m@20, 3x3k) available in the workout grid.`]}],
+      raceHistory:[]
+    };
+    saveState();
+  }
+
+  function saveState(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }catch(e){} }
+  function loadState(){
+    try{
+      const raw=localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const p=JSON.parse(raw);
+        if(p&&Array.isArray(p.roster)&&p.lineups&&p.program&&Array.isArray(p.weekPlan)){
+          if(!p.autoRestMode) p.autoRestMode="individualized";
+          if(typeof p.smallBoatMode!=="boolean") p.smallBoatMode=false;
+          if(!Array.isArray(p.poll)) p.poll=initCoachesPoll(p.program);
+          p.roster.forEach((a,i)=>{ if(!a.classYear) a.classYear=CLASSES[i%4]; if(!a.benchmarks) a.benchmarks={}; if(!Array.isArray(a.testHistory)) a.testHistory=[]; });
+          state=p; return true;
+        }
+      }
+    }catch(e){}
+    return false;
+  }
+
+  // SIMULATION ENGINE
+  function getActiveWeekPlan(){
+    return VIP_CAMP_WEEKS.has(state.week) ? getVipCampPlan() : state.weekPlan;
+  }
+
+  function computeWeeklyPreview(){
+    const plan=getActiveWeekPlan();
+    let totalMin=0, lowMin=0, highMin=0, strengthMin=0, rawPhys=0, rawCns=0, activeSessions=0;
+    const isVip=VIP_CAMP_WEEKS.has(state.week);
+    const cnsModeMult = isVip ? 0 : (state.smallBoatMode ? 1.0 : 0.85);
+    plan.forEach(d=>d.slots.forEach(sl=>{
+      if(!sl||sl.intensity==="off") return;
+      const cat=INTENSITIES[sl.intensity]||INTENSITIES.ut2;
+      const {workMin,singlePieceMin,pieces,rest}=slotToMinutes(sl);
+      if(workMin<=0) return;
+      activeSessions++; totalMin+=workMin;
+      if(cat.isStrength) strengthMin+=workMin; else if(cat.isHigh) highMin+=workMin; else lowMin+=workMin;
+      let rPhys=1; if(pieces>1&&cat.isHigh&&!cat.isStrength){ if(rest<singlePieceMin*0.75)rPhys=1.22; else if(rest>=singlePieceMin*1.5)rPhys=0.90; }
+      rawPhys+=(workMin/60)*cat.physPer60*rPhys;
+      rawCns+=(workMin/60)*cat.cnsPer60*(cat.isHigh?1.0:cnsModeMult)*(isVip?0:1);
+    }));
+    const rowingMin=lowMin+highMin, lowPct=rowingMin>0?Math.round((lowMin/rowingMin)*100):100;
+    return {totalMin:Math.round(totalMin),strengthMin:Math.round(strengthMin),activeSessions,lowPct,highPct:100-lowPct,rawPhys:Math.round(rawPhys),rawCns:Math.round(rawCns),isVip};
+  }
+
+  function advanceWeek(){
+    const weekBullets=[], preview=computeWeeklyPreview();
+    const isVip=VIP_CAMP_WEEKS.has(state.week);
+    const activePlan=getActiveWeekPlan();
+    const sleepBase=8.4; // Normal committed sleep (practice time dropdown removed)
+    const nutMult=1.0;   // Normal committed fueling (fueling dropdown removed)
+    const v8Rowers=["8","7","6","5","4","3","2","1"].map(s=>state.roster.find(a=>a.id===state.lineups.V8[s])).filter(Boolean);
+    const crewAvgAtHr=v8Rowers.length?v8Rowers.reduce((s,a)=>s+a.atHr,0)/v8Rowers.length:173;
+    const isExamWindow=(state.week===7||state.week===14||state.week===27||state.week===35);
+    let alertFlagCount=0, midtermHits=0, fluHits=0;
+
+    // Track benchmark tests scheduled in activePlan
+    const scheduledTests = new Set();
+    activePlan.forEach(d=>d.slots.forEach(sl=>{ if(sl&&INTENSITIES[sl.intensity]&&INTENSITIES[sl.intensity].isTest) scheduledTests.add(sl.intensity); }));
+
+    if(isVip) weekBullets.push(`✨ <strong>VIP Training Camp (Wk ${state.week}):</strong> Locked 90m UT2 AM/PM (Mon–Sat) + 30m Rec Sun AM. <strong>0 CNS gain &amp; 2x VIP Recovery</strong> (massage, infrared, peptides, IVs).`);
+
+    state.roster.forEach(a=>{
+      if(typeof a.physFatigue!=="number") a.physFatigue=12;
+      if(!a.benchmarks) a.benchmarks={};
+      if(!Array.isArray(a.testHistory)) a.testHistory=[];
+
+      if(a.lifeEvent){ a.lifeEvent.weeksLeft-=1; if(a.lifeEvent.weeksLeft<=0){ if(a.lifeEvent.id!=="midterms") weekBullets.push(`<strong>${a.name}</strong> recovered from <em>${a.lifeEvent.label}</em>.`); a.lifeEvent=null; } }
+      if(a.injury){ a.injury.weeksLeft-=1; if(a.injury.weeksLeft<=0){ weekBullets.push(`<strong>${a.name}</strong> cleared medical rehab from <em>${a.injury.label}</em>.`); a.injury=null; } }
+
+      if(!a.lifeEvent && !isVip){
+        const r=Math.random();
+        if(isExamWindow && r<0.22){ a.lifeEvent={id:"midterms",label:"Midterms / Exams",weeksLeft:1,stress:30,sleepLoss:1.8}; midtermHits++; }
+        else if(!a.injury && a.cnsFatigue>72 && a.allostaticLoad>35 && r<0.26){ a.lifeEvent={id:"flu",label:"Flu / Viral Illness",weeksLeft:1,stress:25,sleepLoss:0.5}; a.cnsFatigue=clamp(a.cnsFatigue+18,0,100); a.physFatigue=clamp(a.physFatigue+22,0,100); fluHits++; if(fluHits<=3) weekBullets.push(`🤒 <strong>${a.name}</strong> caught the <strong>Flu</strong>.`); }
+        else if(r<0.013){ a.lifeEvent={id:"breakup",label:"Bad Breakup",weeksLeft:2,stress:35,sleepLoss:1.4}; a.mentalResilience=clamp(a.mentalResilience-4,20,100); weekBullets.push(`💔 <strong>${a.name}</strong>: Bad Breakup (+35 Allostatic).`); }
+        else if(r<0.002){ a.lifeEvent={id:"car_accident",label:"Minor Car Accident",weeksLeft:2,stress:50,sleepLoss:1.0}; a.flexibility=clamp(a.flexibility-15,20,100); a.cnsFatigue=clamp(a.cnsFatigue+25,0,100); weekBullets.push(`🚗 <strong>${a.name}</strong>: Minor Car Accident (2 wks out).`); }
+      }
+
+      const evStress=a.lifeEvent?a.lifeEvent.stress:0, evSleepLoss=a.lifeEvent?a.lifeEvent.sleepLoss:0;
+      a.allostaticLoad=Math.round(clamp(a.allostaticLoad*0.55+evStress,0,100));
+      const sleepHours=clamp(sleepBase-evSleepLoss,4.5,9.5);
+      const sleepMult=Math.pow(Math.min(1,sleepHours/9),1.2);
+      const allostaticDrag=clamp(1-0.0055*a.allostaticLoad,0.35,1);
+      const vipRecMult=isVip?2.0:1.0;
+      const effRecovery=a.recoveryRate*allostaticDrag*sleepMult*nutMult*vipRecMult;
+
+      // 3-Mode Auto-Rest Logic
+      const isInjured = Boolean(a.injury && a.injury.weeksLeft>0) || (a.lifeEvent && a.lifeEvent.id==="car_accident");
+      const isHighRhrOrIll = (calcTodayRHR(a)-a.rhrBase>=10) || (a.lifeEvent && a.lifeEvent.id==="flu");
+      const isFatigued = a.cnsFatigue > 75;
+
+      // 1) Injured athletes ALWAYS only get PT, impact-free cross-training & peptides
+      if(isInjured){
+        a.cnsFatigue=Math.round(clamp(a.cnsFatigue*Math.max(0.22,1-0.65*effRecovery),5,100));
+        a.physFatigue=Math.round(clamp(a.physFatigue*Math.max(0.20,1-0.68*effRecovery),5,100));
+        a.flexibility=Math.round(clamp(a.flexibility+1.2,25,99));
+        a.daysIdle+=3; a.individualRest=false;
+        return;
+      }
+
+      // 2) Mode-specific handling for non-injured athletes
+      let planToRun = activePlan;
+      let forceRest = a.individualRest;
+
+      if(state.autoRestMode==="rest_fatigued" && (isHighRhrOrIll || isFatigued)){
+        forceRest = true;
+      } else if(state.autoRestMode==="individualized" && isHighRhrOrIll && !isVip){
+        // 60m UT2 Mon-Sat AM + 2 Prehab/Rehab sessions
+        planToRun = DAYS.map((_,di)=>({
+          slots:[
+            di<6 ? makeSlot("ut2",1,60,"min",0) : makeSlot("off",1,0,"min",0),
+            (di===1||di===4) ? makeSlot("str_prehab",1,30,"min",0) : makeSlot("off",1,0,"min",0)
+          ]
+        }));
+      }
+      // If boat_all_uninjured: everyone else (even high RHR) does prescribed workouts!
+
+      if(forceRest){
+        a.cnsFatigue=Math.round(clamp(a.cnsFatigue*Math.max(0.25,1-0.58*effRecovery),5,100));
+        a.physFatigue=Math.round(clamp(a.physFatigue*Math.max(0.22,1-0.65*effRecovery),5,100));
+        a.daysIdle+=7;
+        if(a.daysIdle>7 && !a.isCoxswain){ a.vo2Max=Number(clamp(a.vo2Max*0.992,38,72).toFixed(2)); a.atWatts=Math.round(clamp(a.atWatts*0.988,90,580)); }
+        a.individualRest=false;
+        return;
+      }
+
+      let activeDays=0, highWorkMin=0, prehabMin=0;
+      const smallBoatTechMult = state.smallBoatMode ? 1.35 : 1.0;
+      const smallBoatCnsRec = state.smallBoatMode ? 1.25 : 1.0;
+      const offSmallBoatCnsLoad = state.smallBoatMode ? 1.0 : 0.85;
+
+      planToRun.forEach(day=>{
+        let dPhys=0, dCns=0, hasHigh=false, hasRec=false, hadWork=false;
+        day.slots.forEach(slot=>{
+          if(!slot||slot.intensity==="off") return;
+          const cat=INTENSITIES[slot.intensity]||INTENSITIES.ut2;
+          const {workMin,singlePieceMin,pieces,rest}=slotToMinutes(slot);
+          if(workMin<=0) return;
+          hadWork=true;
+          if(cat.isHigh){ hasHigh=true; highWorkMin+=workMin; }
+          if(cat.recoveryBoost) hasRec=true;
+          if(slot.intensity==="str_prehab") prehabMin+=workMin;
+
+          let rPhys=1, rPeak=1;
+          if(pieces>1&&cat.isHigh&&!cat.isStrength){ if(rest<singlePieceMin*0.75)rPhys=1.24; else if(rest>=singlePieceMin*1.5){rPhys=0.90;rPeak=1.15;} }
+          let mFat=1, mAt=1;
+          if(!a.isCoxswain&&(slot.intensity==="pace10k"||slot.intensity==="pace6k")&&v8Rowers.includes(a)){
+            const diff=crewAvgAtHr-a.atHr; if(diff>5){mFat=1.28;mAt=0.75;} else if(diff<-5){mFat=0.85;mAt=0.65;}
+          }
+          const hrs=workMin/60, stressAmp=1+0.004*a.allostaticLoad;
+          const cnsMult = isVip ? 0 : (cat.isHigh ? 1.0 : offSmallBoatCnsLoad);
+
+          if(a.isCoxswain){ dPhys+=hrs*cat.physPer60*0.25; dCns+=hrs*cat.cnsPer60*0.6*stressAmp*cnsMult; }
+          else { dPhys+=hrs*cat.physPer60*rPhys*mFat*stressAmp; dCns+=hrs*cat.cnsPer60*mFat*stressAmp*cnsMult; }
+
+          const effFat=0.60*a.cnsFatigue+0.40*a.physFatigue;
+          let ready=effFat<=65?1:effFat<=85?1-((effFat-65)/20)*0.75:-0.30;
+          if(a.isCoxswain){
+            a.technique=Number(clamp(a.technique+hrs*(cat.techPer60+0.4)*((100-a.technique)/100)*sleepMult,10,99).toFixed(1));
+            return;
+          }
+          const vo2W=calcVO2Watts(a), vo2Cap=Math.max(0.05,1-Math.pow(a.vo2Max/a.geneticVo2Ceiling,3));
+          const pThrot=(vo2W/Math.max(1,a.peakPower))>0.45?0.25:1, aThrot=(a.atWatts/Math.max(1,vo2W))>0.85?0.20:1;
+          const stB=slot.intensity==="ut2"?(1+(a.stPct-70)/100):1;
+          a.vo2Max=Number(clamp(a.vo2Max+hrs*cat.vo2Per60*stB*vo2Cap*pThrot*ready,38,a.geneticVo2Ceiling).toFixed(2));
+          a.atWatts=Math.round(clamp(a.atWatts+hrs*cat.atPer60*mAt*aThrot*ready,90,calcVO2Watts(a)*0.89));
+          a.peakPower=Math.round(clamp(a.peakPower+hrs*cat.peakPer60*rPeak*Math.max(0.15,ready),320,1250));
+          if(cat.leanKgPer60>0&&ready>0){
+            const lwScale=state.program.isLightweight?0.35:1, lDelta=hrs*cat.leanKgPer60*ready*lwScale;
+            const maxW=state.program.isLightweight?(state.program.gender==="Women"?60.5:74.5):108;
+            a.weight=Number(clamp(a.weight+lDelta,48,maxW).toFixed(1));
+            a.leanMassPct=Number(clamp(a.leanMassPct+lDelta*0.005,0.68,0.90).toFixed(2));
+          }
+          if(cat.flexPer60!==0) a.flexibility=Math.round(clamp(a.flexibility+hrs*cat.flexPer60,25,99));
+          let tDelta=hrs*cat.techPer60*Math.pow((100-a.technique)/100,1.35)*sleepMult*smallBoatTechMult;
+          if(a.cnsFatigue>75) tDelta*=0.25;
+          a.technique=Number(clamp(a.technique+tDelta,10,99).toFixed(1));
+        });
+        if(hadWork) activeDays++;
+        a.physFatigue=clamp(a.physFatigue+dPhys,0,100);
+        a.cnsFatigue=clamp(a.cnsFatigue+(isVip?0:dCns),0,100);
+        const recB=(hasRec&&!hasHigh)?1.14:1;
+        a.physFatigue=Math.round(clamp(a.physFatigue*(1-clamp((hasHigh?0.21:0.30)*effRecovery*recB,0.08,0.65)),4,100));
+        a.cnsFatigue=Math.round(clamp(a.cnsFatigue*(1-clamp((hasHigh?0.17:0.24)*effRecovery*recB*smallBoatCnsRec,0.06,0.65)),5,100));
+      });
+
+      if(activeDays===0){
+        a.daysIdle+=7;
+        if(a.daysIdle>7&&!a.isCoxswain){ a.vo2Max=Number(clamp(a.vo2Max*0.994,38,72).toFixed(2)); a.atWatts=Math.round(clamp(a.atWatts*0.990,90,580)); }
+      } else a.daysIdle=0;
+
+      if(!a.isCoxswain){
+        const mDelta=a.cnsFatigue<=65?0.5:a.cnsFatigue>85?-1.5:0;
+        a.mentalResilience=Math.round(clamp(a.mentalResilience+mDelta,20,99));
+        let injRisk=highWorkMin>0?0.004:0.001;
+        if(a.cnsFatigue>75&&a.flexibility<55) injRisk*=8;
+        if(a.cnsFatigue>80&&a.allostaticLoad>55) injRisk*=10;
+        if(prehabMin>=25) injRisk*=0.45;
+        if(isVip) injRisk=0;
+        if(Math.random()<injRisk){
+          const isRib=a.cnsFatigue>80&&a.allostaticLoad>50;
+          a.injury={id:isRib?"rib":"lumbar",label:isRib?"Rib Stress Microtrauma":"Lumbar L5-S1 Strain",weeksLeft:isRib?3:2};
+          weekBullets.push(`🩹 <strong>INJURY: ${a.name}</strong> (${a.injury.label}, ${a.injury.weeksLeft}w).`);
+        }
+      }
+      if(calcTodayRHR(a)-a.rhrBase>=10) alertFlagCount++;
+    });
+
+    // Execute any scheduled Benchmark Tests in the weekPlan
+    scheduledTests.forEach(testKey=>{
+      const testRes=[];
+      state.roster.filter(a=>!a.isCoxswain && !a.injury).forEach(a=>{
+        const res=evaluateBenchmarkTest(a, testKey);
+        a.benchmarks[testKey]={split:res.split,summary:res.summary,week:state.week,year:state.year||1};
+        a.testHistory.unshift({year:state.year||1,week:state.week,label:res.label,summary:res.summary});
+        if(a.testHistory.length>16) a.testHistory.pop();
+        testRes.push({name:a.name,split:res.split,summary:res.summary});
+      });
+      testRes.sort((x,y)=>x.split-y.split);
+      if(testRes.length){
+        const avgS=testRes.reduce((s,r)=>s+r.split,0)/testRes.length;
+        const top3=testRes.slice(0,3).map((r,i)=>`#${i+1} ${r.name}: ${r.summary}`).join(" | ");
+        weekBullets.push(`⏱️ <strong>Benchmark ${INTENSITIES[testKey].label}:</strong> Squad Avg <strong>${formatSplit(avgS)}</strong>. Top 3: ${top3}`);
+        state.raceHistory.unshift({year:state.year||1,week:state.week,event:INTENSITIES[testKey].label,dist:testKey==="test_60m"?"60m":testKey==="test_3x3k"?"3x3k":testKey==="test_6k"?6000:2000,place:"-",totalEntries:testRes.length,timeStr:formatSplit(avgS),standings:top3});
+      }
+    });
+
+    if(midtermHits>0) weekBullets.push(`📚 <strong>Midterms:</strong> ${midtermHits} athlete(s) hit exam stress.`);
+    if(fluHits>3) weekBullets.push(`🤒 <strong>Flu:</strong> ${fluHits} athletes ill.`);
+    if(alertFlagCount>0) weekBullets.push(`⚠️ <strong>${alertFlagCount} athlete(s)</strong> flagged RHR &ge; +10 bpm (Mode: <em>${state.autoRestMode}</em>).`);
+
+    const cal=(WORLD_DB.Leagues[state.program.league]||WORLD_DB.Leagues.Pac10_MPSF).calendar;
+    const regatta=cal.find(r=>r.week===state.week);
+    let logType=alertFlagCount>0?"warn":"info", pollBonus=0;
+    if(regatta){
+      const res=simulateRegatta(regatta);
+      logType="race"; weekBullets.unshift(res.text); pollBonus=res.pollBonus;
+    } else if(weekBullets.length===0){
+      weekBullets.push(`Logged <strong>${preview.totalMin}m</strong> (${preview.activeSessions} sessions • Rowing ${preview.lowPct}/${preview.highPct}% • Strength ${preview.strengthMin}m).`);
+    }
+
+    updateCoachesPoll(pollBonus);
+
+    state.logs.unshift({year:state.year||1,week:state.week,type:logType,title:regatta?`Yr ${state.year||1} Wk ${state.week} — ${regatta.name}`:`Yr ${state.year||1} Wk ${state.week} — ${get52WeekPhase(state.week).season}`,bullets:weekBullets});
+    if(state.logs.length>45) state.logs.pop();
+
+    // END OF WEEK 52: 4-YEAR CLASS CYCLE GRADUATION & INCOMING FRESHMEN
+    if(state.week>=52){
+      const oldYear=state.year||1;
+      const newYear=oldYear+1;
+      const departing = state.roster.filter(a=>a.classYear==="Sr");
+      const departingCount = departing.length;
+      state.roster = state.roster.filter(a=>a.classYear!=="Sr");
+      state.roster.forEach(a=>{
+        if(a.classYear==="Jr") a.classYear="Sr";
+        else if(a.classYear==="So") a.classYear="Jr";
+        else if(a.classYear==="Fr") a.classYear="So";
+      });
+
+      // Success delta: -4 to +4 based on poll rank & prior year race finishes
+      const myRank = state.poll.findIndex(p=>p.isUser)+1 || 4;
+      const pollFactor = myRank<=2 ? 3 : myRank<=4 ? 1 : myRank<=6 ? -1 : -3;
+      const successDelta = clamp(pollFactor + randInt(-1, 1), -4, 4);
+      const targetIncoming = clamp(departingCount + successDelta, 1, 22);
+      const maxAdd = Math.max(0, 60 - state.roster.length);
+      const minNeed = Math.max(0, 12 - state.roster.length);
+      const incomingCount = clamp(targetIncoming, minNeed, maxAdd);
+
+      const usedNames = new Set(state.roster.map(a=>a.name));
+      const curCox = state.roster.filter(a=>a.isCoxswain).length;
+      const needCox = curCox < 2 ? (2 - curCox) : (Math.random()<0.4 ? 1 : 0);
+      for(let i=0;i<incomingCount;i++){
+        const isCox = i < needCox;
+        state.roster.push(createAthlete(state.program,{isCoxswain:isCox,isExpCox:false,classYear:"Fr",usedNames}));
+      }
+      state.program.rosterSize = state.roster.length;
+      // Clean dangling IDs in lineups and auto-fill empty seats
+      const validIds = new Set(state.roster.map(a=>a.id));
+      Object.values(state.lineups).forEach(b=>Object.keys(b).forEach(s=>{ if(b[s]&&!validIds.has(b[s])) b[s]=null; }));
+      state.lineups = autoSelectAllLineups(state.roster);
+
+      state.week=1; state.year=newYear;
+      state.logs.unshift({
+        year:newYear, week:1, type:"race",
+        title:`🎓 Year ${newYear} Class Turnover (Graduated ${departingCount} Sr, Added ${incomingCount} Fr)`,
+        bullets:[
+          `<strong>${departingCount} Seniors</strong> graduated. Remaining classes promoted (Fr&rarr;So&rarr;Jr&rarr;Sr).`,
+          `Recruited <strong>${incomingCount} Freshmen</strong> (Poll Rank #${myRank} &rarr; ${successDelta>=0?"+":""}${successDelta} recruiting swing). Squad size: <strong>${state.roster.length}</strong>.`
+        ]
+      });
+    } else {
+      state.week+=1;
+    }
+    saveState(); renderAll();
+  }
+
+  // BOAT TELEMETRY & REGATTA
+  function computeBoatTelemetry(boatKey="V8"){
+    const def=BOAT_DEFS[boatKey], seatKeys=def.seats.filter(s=>s!=="cox"), bMap=state.lineups[boatKey]||{};
+    const rowers=seatKeys.map(s=>state.roster.find(a=>a.id===bMap[s])).filter(Boolean);
+    const cox=state.roster.find(a=>a.id===bMap.cox), reqCount=seatKeys.length;
+    if(rowers.length<reqCount) return {ready:false,boatKey,label:def.label,reqCount,rowers,cox};
+
+    const avgSplit=rowers.reduce((s,r)=>s+calc2kSplitSec(r,true),0)/reqCount;
+    const totalPower=rowers.reduce((s,r)=>s+calcWattsFromSplit(calc2kSplitSec(r,true)),0);
+    const avgTech=rowers.reduce((s,r)=>s+r.technique,0)/reqCount;
+    const avgWeight=rowers.reduce((s,r)=>s+r.weight,0)/reqCount;
+    const techStd=Math.sqrt(rowers.reduce((s,r)=>s+Math.pow(r.technique-avgTech,2),0)/reqCount);
+    const coxBonus=cox?(cox.technique*0.0008+cox.mentalResilience*0.0005-Math.max(0,cox.weight-55)*0.002):-0.03;
+    const smallBoatTransfer = state.smallBoatMode ? 0.015 : 0;
+    const effFactor=clamp(0.84+(avgTech/100)*0.14-techStd*0.0025+coxBonus+smallBoatTransfer, 0.72, 1.05);
+    const netBoatWatts=totalPower*effFactor;
+    const baseDragK=reqCount===8?16.5:10.6, shellWt=reqCount===8?96:51, refTotalWt=reqCount===8?(84*8+96):(84*4+51);
+    const weightDragRatio=Math.pow((avgWeight*reqCount+shellWt)/refTotalWt,0.35);
+    const est2kTimeSec=clamp(2000/Math.max(3.6,Math.cbrt(netBoatWatts/(baseDragK*weightDragRatio))), 315, 510);
+    const atHrs=rowers.map(r=>r.atHr);
+    return {ready:true,boatKey,label:def.label,reqCount,rowers,cox,avgSplit,avgTech,avgWeight,techStd,effFactor,est2kTimeSec,atSpread:Math.max(...atHrs)-Math.min(...atHrs)};
+  }
+
+  function simulateRegatta(regatta){
+    const tel=computeBoatTelemetry("V8");
+    if(!tel.ready) return {text:`⚠️ Incomplete V8+ for <strong>${regatta.name}</strong>!`,pollBonus:-2};
+    const distMult=regatta.dist/2000, headAdj=regatta.dist>3000?1.07:1;
+    const userTime=tel.est2kTimeSec*distMult*headAdj*rand(0.992,1.008);
+    const leagueTeams=(WORLD_DB.Leagues[state.program.league]||WORLD_DB.Leagues.Pac10_MPSF).teams;
+    const rivals=leagueTeams.filter(t=>t.name!==state.program.name&&t.name!==state.program.teamName).sort(()=>0.5-Math.random()).slice(0,4);
+    const isW=state.program.gender==="Women", isL=state.program.isLightweight, isHS=state.program.levelKey==="HighSchools", isIntl=state.program.levelKey==="National";
+    let topBase=isIntl?(isW?354:320):isHS?(isW?386:350):isL?(isW?380:346):(isW?362:336);
+    const results=[{name:`${state.program.name} (YOU)`,time:userTime,isUser:true}];
+    rivals.forEach(o=>{ results.push({name:o.name,time:(topBase+Math.max(0,99-(o.prestige||80))*0.85)*distMult*headAdj*rand(0.988,1.012),isUser:false}); });
+    results.sort((a,b)=>a.time-b.time);
+    const place=results.findIndex(r=>r.isUser)+1;
+    const medal=place===1?"🥇 1st":place===2?"🥈 2nd":place===3?"🥉 3rd":`${place}th`;
+    const fmt=s=>{ const m=Math.floor(s/60), r=(s-m*60).toFixed(1); return `${m}:${parseFloat(r)<10?"0":""}${r}`; };
+    const standings=results.map((r,i)=>`${i+1}. ${r.name} (${fmt(r.time)})`).join(" | ");
+    state.raceHistory.unshift({year:state.year||1,week:state.week,event:regatta.name,dist:regatta.dist,place,totalEntries:results.length,timeStr:fmt(userTime),standings});
+    if(state.raceHistory.length>30) state.raceHistory.pop();
+    const pollBonus = place===1?3.0:place===2?1.2:place===3?0:-1.5;
+    return {text:`🏁 <strong>${regatta.name} (${regatta.dist}m):</strong> V8+ finished <strong>${medal}</strong> in <strong>${fmt(userTime)}</strong>.`, pollBonus};
+  }
+
+  function runQuick2kTest(){
+    const resList=[];
+    state.roster.filter(a=>!a.isCoxswain&&!a.injury).forEach(a=>{
+      const res=evaluateBenchmarkTest(a,"test_2k");
+      a.benchmarks.test_2k={split:res.split,summary:res.summary,week:state.week,year:state.year||1};
+      a.testHistory.unshift({year:state.year||1,week:state.week,label:"2k",summary:res.summary});
+      if(a.testHistory.length>16) a.testHistory.pop();
+      a.cnsFatigue=Math.round(clamp(a.cnsFatigue+14,0,100));
+      a.physFatigue=Math.round(clamp((a.physFatigue||0)+16,0,100));
+      resList.push({name:a.name,split:res.split,summary:res.summary});
+    });
+    resList.sort((a,b)=>a.split-b.split);
+    const avg=resList.reduce((s,r)=>s+r.split,0)/Math.max(1,resList.length);
+    const top3=resList.slice(0,3).map((r,i)=>`#${i+1} ${r.name}: ${r.summary}`).join(" | ");
+    state.logs.unshift({year:state.year||1,week:state.week,type:"race",title:`Yr ${state.year||1} Wk ${state.week} — Quick 2k Erg Test`,bullets:[`Avg Split: <strong>${formatSplit(avg)}</strong> (${formatTimeFromTotal(avg*4)}).`,`Top 3: ${top3}`]});
+    state.raceHistory.unshift({year:state.year||1,week:state.week,event:"Quick 2k Erg Test",dist:2000,place:"-",totalEntries:resList.length,timeStr:formatTimeFromTotal(avg*4),standings:top3});
+    saveState(); renderAll();
+  }
+
+  // RENDERING
+  function renderAll(){
+    renderHeader(); renderWeekStrip(); renderTemplateSelect(); renderSevenDayGrid();
+    renderDashboard(); renderRoster(); renderLineup(); renderWorldTab(); renderCoachesPoll();
+  }
+
+  function renderHeader(){
+    const p=state.program;
+    document.getElementById("programTierBadge").textContent=p.tier;
+    document.getElementById("programTierBadge").className=`badge ${p.tier.startsWith("S")?"b-tier-s":p.tier.startsWith("A")?"b-tier-a":p.tier.startsWith("B")?"b-tier-b":"b-tier-c"}`;
+    document.getElementById("programDivisionBadge").textContent=`${p.gender}'s ${p.isLightweight?"Lightweight":"Heavyweight"}`;
+    document.getElementById("programSub").textContent=`${p.name} • ${p.leagueLabel} • ${p.home}`;
+    document.getElementById("yearNum").textContent=state.year||1;
+    document.getElementById("weekNum").textContent=state.week;
+    const ph=get52WeekPhase(state.week);
+    document.getElementById("seasonPhase").textContent=ph.short;
+    document.getElementById("recWeekTag").textContent=VIP_CAMP_WEEKS.has(state.week)?"VIP TRAINING CAMP":ph.season;
+    const cal=(WORLD_DB.Leagues[p.league]||WORLD_DB.Leagues.Pac10_MPSF).calendar;
+    const up=cal.find(r=>r.week>=state.week)||cal[0];
+    document.getElementById("nextRacePill").textContent=`Wk ${up.week}: ${up.name}`;
+    const alerts=state.roster.filter(a=>(calcTodayRHR(a)-a.rhrBase>=10)||a.injury||(a.lifeEvent&&a.lifeEvent.id==="flu")).length;
+    document.getElementById("alertCount").textContent=alerts;
+    document.getElementById("alertPill").className=`pill ${alerts>0?"danger":""}`;
+    document.getElementById("rosterCount").textContent=state.roster.length;
+  }
+
+  function renderWeekStrip(){
+    const cal=(WORLD_DB.Leagues[state.program.league]||WORLD_DB.Leagues.Pac10_MPSF).calendar;
+    const raceMap={}; cal.forEach(r=>{ raceMap[r.week]=r.name; });
+    const cells=[];
+    for(let w=1;w<=52;w++){
+      const isNow=w===state.week, isPast=w<state.week, isCamp=VIP_CAMP_WEEKS.has(w), isRace=Boolean(raceMap[w]);
+      const cls=`wk-cell ${isPast?"past":""} ${isCamp?"camp":""} ${isRace?"race":""} ${isNow?"now":""}`;
+      const title=`Wk ${w} (${get52WeekPhase(w).short})${isCamp?" • VIP Camp":""}${isRace?" • "+raceMap[w]:""}`;
+      cells.push(`<div class="${cls}" title="${title}">${w}</div>`);
+    }
+    document.getElementById("weekStrip").innerHTML=cells.join("");
+  }
+
+  function renderTemplateSelect(){
+    const sel=document.getElementById("templateSelect"), prev=sel.value;
+    sel.innerHTML=templates.map(t=>`<option value="${t.id}">${t.builtin?"★ ":""}${t.name}</option>`).join("");
+    if(templates.some(t=>t.id===prev)) sel.value=prev;
+  }
+
+  function buildIntensityOpts(){
+    const r=[], s=[], t=[];
+    Object.entries(INTENSITIES).forEach(([k,o])=>{
+      const opt=`<option value="${k}">${o.label}</option>`;
+      if(o.group==="strength") s.push(opt); else if(o.group==="test") t.push(opt); else r.push(opt);
+    });
+    return `<optgroup label="Rowing / Drills">${r.join("")}</optgroup><optgroup label="Strength">${s.join("")}</optgroup><optgroup label="Benchmark Erg Tests">${t.join("")}</optgroup>`;
+  }
+
+  function renderSevenDayGrid(){
+    const isVip=VIP_CAMP_WEEKS.has(state.week);
+    const banner=document.getElementById("vipCampBanner");
+    if(isVip){
+      banner.style.display="block";
+      banner.innerHTML=`<strong>🔒 VIP Training Camp (Week ${state.week}):</strong> Schedule locked to Mon–Sat AM/PM 90m UT2 + Sun AM 30m Recovery (Sun PM Off). Athletes receive <strong>0 CNS gain</strong> &amp; <strong>2x VIP recovery</strong> (massage, infrared, peptides, IVs).`;
+    } else banner.style.display="none";
+
+    const plan=getActiveWeekPlan(), grid=document.getElementById("sevenDayGrid"), intOpts=buildIntensityOpts();
+    grid.innerHTML=plan.map((day,dIdx)=>{
+      let dayMin=0; day.slots.forEach(sl=>{ dayMin+=slotToMinutes(sl).workMin; });
+      const slotsHtml=day.slots.map((slot,sIdx)=>{
+        const cat=INTENSITIES[slot.intensity]||INTENSITIES.off;
+        const isOff=slot.intensity==="off", isTest=Boolean(cat.isTest);
+        const dis=isVip||isOff?"disabled":"", fixedDis=isVip||isOff||isTest?"disabled":"";
+        const restDis=isVip||isOff||isTest||Number(slot.pieces)<=1?"disabled":"";
+        const unitDis=isVip||isOff||isTest||cat.isStrength?"disabled":"";
+        const dispPieces=cat.fixed?cat.fixed.pieces:slot.pieces;
+        const dispVal=cat.fixed?cat.fixed.value:slot.value;
+        const dispUnit=cat.fixed?cat.fixed.unit:(cat.isStrength?"min":slot.unit);
+        const dispRest=cat.fixed?cat.fixed.rest:slot.rest;
+        const minsEst=slotToMinutes(slot).workMin;
+        return `
+          <div class="slot-box ${isOff?"is-off":isTest?"is-test":cat.isStrength?"is-strength":""}">
+            <div class="slot-title"><span>S${sIdx+1} (${sIdx===0?"AM":"PM"})</span><span>${isOff?"Off":`${Math.round(minsEst)}m`}</span></div>
+            <select class="slot-intensity" data-day="${dIdx}" data-slot="${sIdx}" ${isVip?"disabled":""}>${intOpts}</select>
+            <div class="slot-row"><label>Sets</label><input type="number" class="slot-pieces" data-day="${dIdx}" data-slot="${sIdx}" min="1" max="30" value="${dispPieces}" ${fixedDis}/></div>
+            <div class="slot-row"><label>Work</label><input type="number" class="slot-value" data-day="${dIdx}" data-slot="${sIdx}" min="1" max="50000" step="${dispUnit==="m"?250:5}" value="${dispVal}" ${fixedDis}/>
+              <select class="slot-unit" data-day="${dIdx}" data-slot="${sIdx}" ${unitDis}><option value="min" ${dispUnit==="min"?"selected":""}>min</option><option value="m" ${dispUnit==="m"?"selected":""}>m</option></select>
+            </div>
+            <div class="slot-row"><label>Rest</label><input type="number" class="slot-rest" data-day="${dIdx}" data-slot="${sIdx}" min="0" max="60" value="${dispRest}" ${restDis}/><span style="font-size:10px;color:var(--muted);">m</span></div>
+          </div>`;
+      }).join("");
+      return `<div class="day-col"><div class="day-header"><span>${DAYS[dIdx]}</span><span class="day-load">${Math.round(dayMin)}m</span></div>${slotsHtml}</div>`;
+    }).join("");
+
+    grid.querySelectorAll(".slot-intensity").forEach(sel=>{
+      const d=Number(sel.dataset.day), s=Number(sel.dataset.slot);
+      sel.value=plan[d].slots[s].intensity;
+      if(isVip) return;
+      sel.addEventListener("change",e=>{
+        const sl=state.weekPlan[d].slots[s], ni=e.target.value, cat=INTENSITIES[ni]||INTENSITIES.off;
+        sl.intensity=ni;
+        if(cat.fixed){ sl.pieces=cat.fixed.pieces; sl.value=cat.fixed.value; sl.unit=cat.fixed.unit; sl.rest=cat.fixed.rest; }
+        else if(cat.isStrength){ sl.unit="min"; if(sl.value>120||sl.value<=0)sl.value=45; }
+        else if(ni!=="off"&&sl.value<=0){ sl.value=sl.unit==="m"?2000:45; }
+        saveState(); renderSevenDayGrid();
+      });
+    });
+    if(!isVip){
+      grid.querySelectorAll(".slot-pieces").forEach(i=>i.addEventListener("change",e=>{ state.weekPlan[e.target.dataset.day].slots[e.target.dataset.slot].pieces=clamp(Number(e.target.value)||1,1,30); saveState(); renderSevenDayGrid(); }));
+      grid.querySelectorAll(".slot-value").forEach(i=>i.addEventListener("change",e=>{ const sl=state.weekPlan[e.target.dataset.day].slots[e.target.dataset.slot], cat=INTENSITIES[sl.intensity]||INTENSITIES.off, u=cat.isStrength?"min":sl.unit; sl.value=clamp(Number(e.target.value)||1,1,u==="m"?40000:240); saveState(); renderSevenDayGrid(); }));
+      grid.querySelectorAll(".slot-unit").forEach(s=>s.addEventListener("change",e=>{ const sl=state.weekPlan[e.target.dataset.day].slots[e.target.dataset.slot], nu=e.target.value; if(sl.unit!==nu){ const cat=INTENSITIES[sl.intensity]||INTENSITIES.ut2; sl.value=nu==="m"?Math.max(250,Math.round((sl.value*cat.paceMPerMin)/250)*250):Math.max(1,Math.round(sl.value/cat.paceMPerMin)); sl.unit=nu; } saveState(); renderSevenDayGrid(); }));
+      grid.querySelectorAll(".slot-rest").forEach(i=>i.addEventListener("change",e=>{ state.weekPlan[e.target.dataset.day].slots[e.target.dataset.slot].rest=clamp(Number(e.target.value)||0,0,60); saveState(); renderWeeklyPreview(); }));
+    }
+    renderWeeklyPreview();
+  }
+
+  function renderWeeklyPreview(){
+    const p=computeWeeklyPreview();
+    document.getElementById("weeklyPreviewBar").innerHTML=`
+      <span>Vol: <strong>${p.totalMin}m</strong> (${p.activeSessions} sess)</span>
+      <span>Rowing: <strong>${p.lowPct}% Low / ${p.highPct}% High</strong></span>
+      <span>Strength: <strong style="color:var(--purple);">${p.strengthMin}m</strong></span>
+      <span>Phys Load: <strong style="color:${p.rawPhys>110?"var(--red)":"var(--accent)"}">${p.rawPhys}</strong></span>
+      <span>CNS Load: <strong style="color:${p.rawCns>95?"var(--red)":"var(--gold)"}">${p.rawCns}${p.isVip?" (VIP 0)":""}</strong></span>`;
+  }
+
+  function renderDashboard(){
+    document.getElementById("autoRestModeSelect").value=state.autoRestMode||"individualized";
+    document.getElementById("smallBoatToggle").checked=Boolean(state.smallBoatMode);
+    const rowers=state.roster.filter(a=>!a.isCoxswain);
+    const avgVo2=(rowers.reduce((s,r)=>s+r.vo2Max,0)/Math.max(1,rowers.length)).toFixed(1);
+    const avgCns=Math.round(rowers.reduce((s,r)=>s+r.cnsFatigue,0)/Math.max(1,rowers.length));
+    const avgPhys=Math.round(rowers.reduce((s,r)=>s+(r.physFatigue||0),0)/Math.max(1,rowers.length));
+    const avgSplit=rowers.reduce((s,r)=>s+calc2kSplitSec(r),0)/Math.max(1,rowers.length);
+    document.getElementById("teamKpiGrid").innerHTML=`
+      <div class="kpi"><div class="k-label">Squad Avg VO2 (${rowers.length} Rowers)</div><div class="k-val">${avgVo2}</div></div>
+      <div class="kpi"><div class="k-label">Squad Avg 2k Split</div><div class="k-val">${formatSplit(avgSplit)}</div></div>
+      <div class="kpi"><div class="k-label">Avg CNS / Phys Fatigue</div><div class="k-val" style="color:${avgCns>70?"var(--red)":avgCns>50?"var(--gold)":"var(--green)"}">${avgCns}% <span style="font-size:12px;color:var(--muted);">/ ${avgPhys}%</span></div></div>
+      <div class="kpi"><div class="k-label">Avg Peak / Tech</div><div class="k-val">${Math.round(rowers.reduce((s,r)=>s+r.peakPower,0)/Math.max(1,rowers.length))}W <span style="font-size:12px;color:var(--muted);">/ ${(rowers.reduce((s,r)=>s+r.technique,0)/Math.max(1,rowers.length)).toFixed(1)}</span></div></div>`;
+    const over=rowers.filter(a=>calcTodayRHR(a)-a.rhrBase>=10).length;
+    document.getElementById("coachTipBox").innerHTML=over>0
+      ?`<strong>Alert:</strong> ${over} rower(s) at <strong>RHR &ge; +10 bpm</strong>. Current Auto-Rest Mode: <strong>${state.autoRestMode}</strong>.`
+      :`<strong>Sports Science:</strong> Normal committed sleep/fueling active. ${state.smallBoatMode?"Small-Boat Selection ON (+25% CNS recovery, +35% tech transfer).":"8+/Erg Base ON (low standard row CNS)."}`;
+    document.getElementById("logFeed").innerHTML=state.logs.map(l=>`<div class="log-entry ${l.type}"><div class="log-head"><span>${l.title}</span><span>YR ${l.year||1} Wk ${l.week}</span></div><ul>${l.bullets.map(b=>`<li>${b}</li>`).join("")}</ul></div>`).join("");
+  }
+
+  function getBoatAssignmentLookup(){
+    const map={}; Object.entries(state.lineups).forEach(([k,seats])=>Object.entries(seats).forEach(([s,id])=>{ if(id)map[id]=s==="cox"?`${k} Cox`:`${k} #${s}`; }));
+    return map;
+  }
+
+  function renderRoster(){
+    const seatLookup=getBoatAssignmentLookup(), search=(document.getElementById("rosterSearch").value||"").toLowerCase().trim(), filter=document.getElementById("rosterFilter").value, sortBy=document.getElementById("rosterSort").value;
+    let list=state.roster.filter(a=>{
+      if(search&&!a.name.toLowerCase().includes(search)&&!a.background.toLowerCase().includes(search))return false;
+      if(filter==="rowers"&&a.isCoxswain)return false;
+      if(filter==="cox"&&!a.isCoxswain)return false;
+      if(filter==="boats"&&!seatLookup[a.id])return false;
+      if(filter==="alerts"&&!(calcTodayRHR(a)-a.rhrBase>=10||a.injury||a.lifeEvent))return false;
+      if(filter==="trans"&&a.identityTag==="cis")return false;
+      return true;
+    });
+    const clsOrder={Sr:4,Jr:3,So:2,Fr:1};
+    list.sort((a,b)=>{
+      if(sortBy==="split"){ if(a.isCoxswain!==b.isCoxswain)return a.isCoxswain?1:-1; return calc2kSplitSec(a)-calc2kSplitSec(b); }
+      if(sortBy==="vo2") return b.vo2Max-a.vo2Max;
+      if(sortBy==="peak") return b.peakPower-a.peakPower;
+      if(sortBy==="tech") return b.technique-a.technique;
+      if(sortBy==="cns") return b.cnsFatigue-a.cnsFatigue;
+      if(sortBy==="class") return (clsOrder[b.classYear]||0)-(clsOrder[a.classYear]||0);
+      return a.name.localeCompare(b.name);
+    });
+    document.getElementById("rosterFilterCount").textContent=`Showing ${list.length}/${state.roster.length}`;
+    const tbody=document.getElementById("rosterTbody");
+    tbody.innerHTML=list.map(a=>{
+      const rhr=calcTodayRHR(a), dR=rhr-a.rhrBase, phys=a.physFatigue||0;
+      const pCol=phys>75?"var(--red)":phys>50?"var(--gold)":"var(--accent)", cCol=a.cnsFatigue>75?"var(--red)":a.cnsFatigue>50?"var(--gold)":"var(--green)";
+      const b=a.benchmarks||{};
+      const bmStr=a.isCoxswain?"-":`${b.test_2k?formatSplit(b.test_2k.split):"-"} / ${b.test_6k?formatSplit(b.test_6k.split):"-"} / ${b.test_60m?formatSplit(b.test_60m.split):"-"} / ${b.test_3x3k?formatSplit(b.test_3x3k.split):"-"}`;
+      let st=`<span class="badge b-ok">OK</span>`;
+      if(a.injury) st=`<span class="badge b-bad">${a.injury.label} (${a.injury.weeksLeft}w)</span>`;
+      else if(a.lifeEvent) st=`<span class="badge b-warn">${a.lifeEvent.label}</span>`;
+      if(a.individualRest) st+=` <span class="badge b-info">Rest</span>`;
+      const seatB=seatLookup[a.id]?`<span class="badge b-info">${seatLookup[a.id]}</span>`:"";
+      const idB=a.identityTag==="trans"?`<span class="badge b-trans">${a.genderIdentity}</span>`:a.identityTag==="nb"?`<span class="badge b-nb">NB</span>`:"";
+      return `<tr class="clickable" data-id="${a.id}">
+        <td><strong>${a.name}</strong> <span class="badge b-info">${a.classYear||"Fr"}</span> ${idB} ${seatB}</td>
+        <td style="color:var(--muted);">${a.background}</td>
+        <td class="mono">${a.height}/${a.weight}</td>
+        <td class="mono">${a.isCoxswain?"-":a.vo2Max.toFixed(1)}</td>
+        <td class="mono">${a.isCoxswain?"-":`${a.peakPower}/${a.atWatts}W`}</td>
+        <td class="mono">${a.isCoxswain?"Cox":formatSplit(calc2kSplitSec(a))}</td>
+        <td class="mono" style="font-size:11px;">${bmStr}</td>
+        <td class="mono">${Math.round(a.technique)}/${Math.round(a.flexibility)}</td>
+        <td class="mono">${phys}% / <span style="color:${cCol}">${a.cnsFatigue}%</span></td>
+        <td class="mono" style="color:${dR>=10?"var(--red)":"inherit"}">${rhr}${dR>=10?`(+${dR})`:""}</td>
+        <td>${st}</td>
+      </tr>`;
+    }).join("");
+    tbody.querySelectorAll("tr.clickable").forEach(tr=>tr.addEventListener("click",()=>openAthleteModal(tr.dataset.id)));
+  }
+
+  function renderLineup(){
+    document.querySelectorAll("#boatSelectorBtns .btn-boat").forEach(b=>b.classList.toggle("active",b.dataset.boat===activeBoatKey));
+    const def=BOAT_DEFS[activeBoatKey], bMap=state.lineups[activeBoatKey]||{}, allAssign=getBoatAssignmentLookup();
+    document.getElementById("boatTelemetryTitle").textContent=`${def.label} Telemetry`;
+    const labels={"8":"Stroke (8)","7":"7 Seat","6":"6 Seat","5":"5 Seat","4":"4 Seat","3":"3 Seat","2":"2 Seat","1":"Bow (1)","cox":"Coxswain"};
+    if(activeBoatKey==="V4") labels["4"]="Stroke (4)";
+    const cont=document.getElementById("lineupSeats");
+    cont.innerHTML=def.seats.map(sKey=>{
+      const aid=bMap[sKey], ath=state.roster.find(a=>a.id===aid);
+      const opts=state.roster.slice().sort((a,b)=>{
+        if(sKey==="cox"&&a.isCoxswain!==b.isCoxswain)return a.isCoxswain?-1:1;
+        if(sKey!=="cox"&&a.isCoxswain!==b.isCoxswain)return a.isCoxswain?1:-1;
+        return calc2kSplitSec(a)-calc2kSplitSec(b);
+      }).map(a=>{
+        const tag=a.isCoxswain?"[COX]":`${formatSplit(calc2kSplitSec(a))}, T:${Math.round(a.technique)}`;
+        const oth=allAssign[a.id]&&a.id!==aid?` [${allAssign[a.id]}]`:"" ;
+        return `<option value="${a.id}" ${a.id===aid?"selected":""}>${a.name} (${a.classYear}, ${tag})${oth}${a.injury?" [INJ]":""}</option>`;
+      }).join("");
+      const meta=ath?(ath.isCoxswain?`${ath.weight}kg • T:${Math.round(ath.technique)}`:`${formatSplit(calc2kSplitSec(ath))} • T:${Math.round(ath.technique)} • CNS:${ath.cnsFatigue}%`):"Unassigned";
+      return `<div class="seat-row"><div class="seat-label">${labels[sKey]}</div><select class="seat-select" data-seat="${sKey}"><option value="">-- Select --</option>${opts}</select><div class="seat-meta">${meta}</div></div>`;
+    }).join("");
+    cont.querySelectorAll(".seat-select").forEach(sel=>sel.addEventListener("change",e=>{
+      const seat=e.target.dataset.seat, nid=e.target.value||null, oid=state.lineups[activeBoatKey][seat]||null;
+      if(nid) Object.keys(state.lineups).forEach(bk=>Object.keys(state.lineups[bk]).forEach(sk=>{ if((bk!==activeBoatKey||sk!==seat)&&state.lineups[bk][sk]===nid) state.lineups[bk][sk]=bk===activeBoatKey?oid:null; }));
+      state.lineups[activeBoatKey][seat]=nid; saveState(); renderLineup(); renderRoster();
+    }));
+
+    const tel=computeBoatTelemetry(activeBoatKey);
+    if(!tel.ready){
+      document.getElementById("boatKpiGrid").innerHTML=`<div class="kpi" style="grid-column:span 2;"><div class="k-label">Incomplete</div><div class="k-val" style="font-size:13px;color:var(--gold);">Assign ${tel.reqCount} Rowers</div></div>`;
+      document.getElementById("boatAnalysisBox").textContent="Fill all rowing seats to calculate boat speed.";
+    } else {
+      const m=Math.floor(tel.est2kTimeSec/60), s=(tel.est2kTimeSec-m*60).toFixed(1), tStr=`${m}:${parseFloat(s)<10?"0":""}${s}`;
+      document.getElementById("boatKpiGrid").innerHTML=`
+        <div class="kpi"><div class="k-label">Proj 2,000m</div><div class="k-val" style="color:var(--accent);">${tStr}</div></div>
+        <div class="kpi"><div class="k-label">Avg 2k Split</div><div class="k-val">${formatSplit(tel.avgSplit)}</div></div>
+        <div class="kpi"><div class="k-label">Crew Sync</div><div class="k-val">${(tel.effFactor*100).toFixed(1)}%</div></div>
+        <div class="kpi"><div class="k-label">Avg Weight</div><div class="k-val">${tel.avgWeight.toFixed(1)} kg</div></div>`;
+      const lwCap=state.program.gender==="Women"?57:70;
+      const lwWarn=state.program.isLightweight&&tel.avgWeight>lwCap?`<br><strong style="color:var(--red);">Over ${lwCap}kg Lwt cap!</strong>`:"";
+      document.getElementById("boatAnalysisBox").innerHTML=`Avg Tech <strong>${tel.avgTech.toFixed(1)}</strong> (SD ${tel.techStd.toFixed(1)}). ${tel.cox?`Cox: <strong>${tel.cox.name}</strong>`:"No coxswain!"} ${lwWarn}`;
+    }
+    document.getElementById("raceHistoryFeed").innerHTML=state.raceHistory.length===0
+      ?`<div class="log-entry">No races or benchmark tests yet.</div>`
+      :state.raceHistory.map(r=>`<div class="log-entry race"><div class="log-head"><span>YR ${r.year||1} WK ${r.week} • ${r.event}</span><span>${r.place==="-"?"BENCHMARK":`#${r.place}/${r.totalEntries}`}</span></div><div><strong>${r.timeStr}</strong> — ${r.standings}</div></div>`).join("");
+  }
+
+  function renderWorldTab(){
+    const ld=WORLD_DB.Leagues[state.program.league]||WORLD_DB.Leagues.Pac10_MPSF;
+    document.getElementById("calLeagueLabel").textContent=ld.label;
+    const regMap={}; ld.calendar.forEach(r=>{ regMap[r.week]=r; });
+    const rows=[];
+    for(let w=1;w<=52;w++){
+      if(regMap[w]) rows.push(regMap[w]);
+      else if(VIP_CAMP_WEEKS.has(w)) rows.push({week:w,season:get52WeekPhase(w).short,name:"VIP Training Camp (Locked)",dist:"-",format:"0 CNS gain • 2x VIP recovery"});
+      else if(w===1||w===11||w===25||w===40||w===47||w===state.week) rows.push({week:w,season:get52WeekPhase(w).short,name:`${get52WeekPhase(w).season}`,dist:"-",format:w>=47?"Transition":"Training Block"});
+    }
+    document.getElementById("calendarTbody").innerHTML=rows.map(r=>{
+      const isNow=r.week===state.week, isRace=Boolean(regMap[r.week]);
+      return `<tr style="${isNow?"background:var(--accent-dim);":r.week<state.week?"opacity:0.55;":""}"><td class="mono">Wk ${r.week}</td><td>${r.season}</td><td>${isRace?`<strong>🏆 ${r.name}</strong>`:r.name}${isNow?' <span class="badge b-info">NOW</span>':""}</td><td class="mono">${r.dist==="-"?"-":r.dist+"m"}</td><td style="color:var(--muted);white-space:normal;">${r.format}</td></tr>`;
+    }).join("");
+    const tk=document.getElementById("tierViewSelect").value, td=WORLD_DB.Tiers[tk];
+    document.getElementById("tierListContainer").innerHTML=Object.entries(td).map(([tn,arr])=>`<div style="margin-bottom:10px;"><span class="badge ${tn.startsWith("S")?"b-tier-s":tn.startsWith("A")?"b-tier-a":tn.startsWith("B")?"b-tier-b":"b-tier-c"}">${tn.replace("_","-")}</span>${arr.map(i=>`<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:7px;margin-top:5px;"><strong>${i.name}</strong> <span class="mono" style="float:right;color:var(--accent);">P${i.prestige}</span><div style="font-size:11px;color:var(--muted);">${i.home} • ${i.notes}</div></div>`).join("")}</div>`).join("");
+  }
+
+  function renderCoachesPoll(){
+    document.getElementById("pollWeekBadge").textContent=`Yr ${state.year||1} Wk ${state.week}`;
+    const poll=state.poll||[];
+    document.getElementById("coachesPollList").innerHTML=poll.map((p,idx)=>`
+      <div class="poll-item ${p.isUser?"is-user":""}">
+        <span class="poll-rank">#${idx+1}</span>
+        <span style="flex:1;font-weight:${p.isUser?700:500};">${p.name}${p.isUser?" (YOU)":""}</span>
+        <span class="poll-pts">${p.rating.toFixed(1)}</span>
+      </div>`).join("");
+  }
+
+  // MODALS & EVENTS
+  function openAthleteModal(id){
+    const a=state.roster.find(x=>x.id===id); if(!a)return;
+    activeModalAthleteId=id;
+    const rhr=calcTodayRHR(a), dR=rhr-a.rhrBase, b=a.benchmarks||{};
+    document.getElementById("mName").textContent=`${a.name} [${a.classYear||"Fr"}] (${a.pronouns})`;
+    document.getElementById("mSub").textContent=`${a.genderIdentity} • ${a.background} • ${a.isCoxswain?"Coxswain":"Rower"}`;
+    document.getElementById("mBio").textContent=`"${a.bio}"`;
+    document.getElementById("mStats").innerHTML=`
+      <div class="stat-mini"><span>Ht / Wt</span><strong>${a.height}cm / ${a.weight}kg</strong></div>
+      <div class="stat-mini"><span>VO2 Max</span><strong>${a.isCoxswain?"N/A":`${a.vo2Max.toFixed(1)} (Max ${a.geneticVo2Ceiling})`}</strong></div>
+      <div class="stat-mini"><span>Est 2k</span><strong>${a.isCoxswain?"Cox":formatSplit(calc2kSplitSec(a))}</strong></div>
+      <div class="stat-mini"><span>AT / Peak</span><strong>${a.isCoxswain?"-":`${a.atWatts}W / ${a.peakPower}W`}</strong></div>
+      <div class="stat-mini"><span>Tech / Flex</span><strong>${Math.round(a.technique)} / ${Math.round(a.flexibility)}</strong></div>
+      <div class="stat-mini"><span>Phys / CNS</span><strong>${a.physFatigue||0}% / ${a.cnsFatigue}%</strong></div>
+      <div class="stat-mini"><span>RHR</span><strong style="color:${dR>=10?"var(--red)":"inherit"}">${rhr} (Base ${a.rhrBase})</strong></div>
+      <div class="stat-mini"><span>Allostatic</span><strong>${a.allostaticLoad}/100</strong></div>
+      <div class="stat-mini"><span>Mental</span><strong>${a.mentalResilience}/100</strong></div>`;
+    document.getElementById("mBenchmarks").innerHTML=a.isCoxswain?"Coxswain (no erg benchmarks).":
+      `<strong>2k:</strong> ${b.test_2k?b.test_2k.summary:"—"} &nbsp;|&nbsp; <strong>6k:</strong> ${b.test_6k?b.test_6k.summary:"—"}<br><strong>60m@20:</strong> ${b.test_60m?b.test_60m.summary:"—"} &nbsp;|&nbsp; <strong>3x3k (avg):</strong> ${b.test_3x3k?b.test_3x3k.summary:"—"}`;
+    document.getElementById("mTestHistory").innerHTML=(a.testHistory&&a.testHistory.length)
+      ?a.testHistory.map(h=>`<div>Yr${h.year} Wk${h.week} [${h.label}]: ${h.summary}</div>`).join("")
+      :"No recorded benchmark tests yet.";
+    const w=[];
+    if(dR>=10) w.push(`⚠️ +${dR} bpm RHR spike`);
+    if(a.injury) w.push(`🩹 Injury: ${a.injury.label} (${a.injury.weeksLeft}w)`);
+    if(a.lifeEvent) w.push(`📌 ${a.lifeEvent.label} (${a.lifeEvent.weeksLeft}w)`);
+    if(a.individualRest) w.push(`🛌 Individual Rest Active`);
+    document.getElementById("mAlerts").innerHTML=w.length?w.join(" • "):"Biomarkers within normal range.";
+    document.getElementById("athleteModal").classList.add("open");
+  }
+
+  function populateSetupTeams(){
+    const lid=document.getElementById("setupLeague").value, wt=document.getElementById("setupWeight").value;
+    let teams=(WORLD_DB.Leagues[lid]||WORLD_DB.Leagues.Pac10_MPSF).teams;
+    if(wt==="Light"&&(lid==="Ivy_EARC"||lid==="IRA"||lid==="Pac10_MPSF")){
+      teams=[]; Object.entries(WORLD_DB.Tiers.Colleges_Light).forEach(([k,arr])=>arr.forEach(t=>teams.push({...t,tier:k.replace("_","-")})));
+    }
+    document.getElementById("setupTeam").innerHTML=teams.map((t,i)=>`<option value="${i}">${t.name} (${t.tier} • P${t.prestige})</option>`).join("");
+    if(lid==="NCAA_D1"&&document.getElementById("setupGender").value==="Men") document.getElementById("setupGender").value="Women";
+  }
+
+  function bindEvents(){
+    document.querySelectorAll(".tab-btn").forEach(btn=>btn.addEventListener("click",()=>{
+      document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+      btn.classList.add("active"); document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+    }));
+    document.getElementById("btnAdvance").addEventListener("click",advanceWeek);
+    document.getElementById("btnErgTest").addEventListener("click",runQuick2kTest);
+    document.getElementById("btnOpenSetup").addEventListener("click",()=>{ populateSetupTeams(); document.getElementById("setupModal").classList.add("open"); });
+
+    document.getElementById("btnLoadTemplate").addEventListener("click",()=>{
+      if(VIP_CAMP_WEEKS.has(state.week))return;
+      const tpl=templates.find(t=>t.id===document.getElementById("templateSelect").value);
+      if(tpl){ state.weekPlan=cloneWeekPlan(tpl.days); saveState(); renderSevenDayGrid(); }
+    });
+    document.getElementById("btnSaveTemplate").addEventListener("click",()=>{
+      const inp=document.getElementById("templateNameInput"), name=inp.value.trim();
+      if(!name){ inp.focus(); return; }
+      templates.push({id:`tpl_${Date.now()}`,name,builtin:false,days:cloneWeekPlan(state.weekPlan)});
+      saveTemplates(); renderTemplateSelect(); inp.value="";
+    });
+    document.getElementById("btnDeleteTemplate").addEventListener("click",()=>{
+      const idx=templates.findIndex(t=>t.id===document.getElementById("templateSelect").value);
+      if(idx>-1&&!templates[idx].builtin){ templates.splice(idx,1); saveTemplates(); renderTemplateSelect(); }
+    });
+
+    document.getElementById("autoRestModeSelect").addEventListener("change",e=>{ state.autoRestMode=e.target.value; saveState(); renderDashboard(); });
+    document.getElementById("smallBoatToggle").addEventListener("change",e=>{ state.smallBoatMode=e.target.checked; saveState(); renderWeeklyPreview(); renderDashboard(); renderLineup(); });
+    document.getElementById("rosterSearch").addEventListener("input",renderRoster);
+    document.getElementById("rosterFilter").addEventListener("change",renderRoster);
+    document.getElementById("rosterSort").addEventListener("change",renderRoster);
+    document.querySelectorAll("#boatSelectorBtns .btn-boat").forEach(b=>b.addEventListener("click",()=>{ activeBoatKey=b.dataset.boat; renderLineup(); }));
+    document.getElementById("btnAutoLineupAll").addEventListener("click",()=>{ state.lineups=autoSelectAllLineups(state.roster); saveState(); renderLineup(); renderRoster(); });
+    document.getElementById("tierViewSelect").addEventListener("change",renderWorldTab);
+
+    document.getElementById("btnCloseModal").addEventListener("click",()=>document.getElementById("athleteModal").classList.remove("open"));
+    document.getElementById("athleteModal").addEventListener("click",e=>{ if(e.target.id==="athleteModal")document.getElementById("athleteModal").classList.remove("open"); });
+    document.getElementById("btnToggleRest").addEventListener("click",()=>{ const a=state.roster.find(x=>x.id===activeModalAthleteId); if(a){ a.individualRest=!a.individualRest; saveState(); openAthleteModal(a.id); renderRoster(); } });
+
+    document.getElementById("setupLeague").addEventListener("change",populateSetupTeams);
+    document.getElementById("setupWeight").addEventListener("change",populateSetupTeams);
+    document.getElementById("setupGender").addEventListener("change",populateSetupTeams);
+    document.getElementById("setupRosterSize").addEventListener("input",e=>{ document.getElementById("setupRosterSizeVal").textContent=e.target.value; });
+    document.getElementById("btnCancelSetup").addEventListener("click",()=>document.getElementById("setupModal").classList.remove("open"));
+    document.getElementById("btnStartCareer").addEventListener("click",()=>{
+      const lid=document.getElementById("setupLeague").value, wt=document.getElementById("setupWeight").value;
+      let teams=(WORLD_DB.Leagues[lid]||WORLD_DB.Leagues.Pac10_MPSF).teams;
+      if(wt==="Light"&&(lid==="Ivy_EARC"||lid==="IRA"||lid==="Pac10_MPSF")){
+        teams=[]; Object.entries(WORLD_DB.Tiers.Colleges_Light).forEach(([k,arr])=>arr.forEach(t=>teams.push({...t,tier:k.replace("_","-")})));
+      }
+      const teamObj=teams[Number(document.getElementById("setupTeam").value)||0]||teams[0];
+      createNewGame({gender:document.getElementById("setupGender").value,weight:wt,league:lid,teamObj,customName:document.getElementById("setupCustomName").value,rosterSize:Number(document.getElementById("setupRosterSize").value)});
+      document.getElementById("setupModal").classList.remove("open");
+      document.getElementById("tierViewSelect").value=state.program.tierPool;
+      renderAll();
+    });
+  }
+
+  loadTemplates();
+  if(!loadState()) createNewGame({gender:"Men",weight:"Heavy",league:"Pac10_MPSF",teamObj:WORLD_DB.Leagues.Pac10_MPSF.teams[0],customName:"",rosterSize:36});
+  document.getElementById("tierViewSelect").value=state.program.tierPool||"Colleges_Heavy";
+  bindEvents();
+  renderAll();
+})();
+</script>
+</body>
+</html>
